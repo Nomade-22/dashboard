@@ -16,7 +16,7 @@ header{position:sticky; top:0; z-index:50; backdrop-filter:saturate(140%) blur(6
 .title h1{font-size:18px; margin:0; letter-spacing:.2px}
 .tabs{display:flex; gap:8px}
 .btn{background:var(--panel-2); color:var(--text); border:1px solid var(--border);
-  padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; transition:.2s ease;}
+  padding:12px 16px; border-radius:12px; cursor:pointer; font-weight:600; transition:.2s ease; min-height:40px}
 .btn:hover{border-color:var(--primary); box-shadow:var(--ring)}
 .btn.primary{background:var(--primary); border-color:transparent; color:#0a0f1a}
 .btn.ghost{background:transparent}
@@ -27,7 +27,7 @@ main{max-width:1220px; margin:24px auto; padding:0 16px}
 @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
 .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);}
 .muted{color:var(--muted)}
-.pill{display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:var(--panel-2)}
+.pill{display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:var(--panel-2)}
 
 /* Dashboard */
 .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
@@ -35,22 +35,30 @@ main{max-width:1220px; margin:24px auto; padding:0 16px}
 .kpi .value{font-size:26px; font-weight:700; margin-top:6px}
 .kpi .sub{margin-top:6px; font-size:12px; color:var(--muted)}
 .grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px}
-.chart-wrap{min-height:340px} 
+.chart-wrap{min-height:340px}
 canvas{width:100% !important; height:300px !important}
 .header-filters{display:flex; gap:12px; align-items:end; flex-wrap:wrap}
-.toolbar{display:flex; gap:8px; margin:12px 0}
-table{width:100%; border-collapse:collapse; margin-top:12px; font-size:14px}
-th,td{border-bottom:1px solid var(--border); padding:10px; text-align:center}
-tr:hover td{background:#121724}
+.toolbar{display:flex; gap:8px; margin:12px 0; flex-wrap:wrap}
+
+/* Drop zone */
+.dropzone{border:1px dashed var(--border); background:rgba(255,255,255,.02); padding:12px 14px; border-radius:12px; font-size:13px; color:var(--muted)}
+.dropzone.drag{border-color:var(--primary); background:rgba(79,140,255,.08)}
 
 /* Inputs */
 label.small{display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--muted)}
 input, select, textarea{
   background:var(--panel-2); color:var(--text); border:1px solid var(--border);
-  padding:10px 12px; border-radius:10px; outline:none; min-width:160px; width:100%;
+  padding:12px 12px; border-radius:12px; outline:none; min-width:160px; width:100%;
+  -webkit-appearance:none; appearance:none;
 }
 textarea{min-height:84px; resize:vertical}
 input:focus, select:focus, textarea:focus{border-color:var(--primary); box-shadow:var(--ring)}
+
+/* Tabela */
+.table-wrap{width:100%; overflow-x:auto}
+table{width:100%; border-collapse:separate; border-spacing:0; margin-top:12px; font-size:14px; min-width:720px}
+th,td{border-bottom:1px solid var(--border); padding:10px 8px; text-align:center; white-space:nowrap}
+tr:hover td{background:#121724}
 
 /* OFs */
 .of-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px}
@@ -61,9 +69,9 @@ input:focus, select:focus, textarea:focus{border-color:var(--primary); box-shado
 .tag-danger{background:rgba(255,82,82,.1); color:#ffb4b4; border-color:rgba(255,82,82,.3)}
 
 /* Colunas */
-.two-col{display:grid; grid-template-columns:minmax(320px,420px) 1fr; gap:14px}
+.two-col{display:grid; grid-template-columns:minmax(320px,440px) 1fr; gap:14px}
 
-/* ==== Ajuste layout "Novo Lançamento" ==== */
+/* Form lançamentos (mais limpo no mobile) */
 .form{display:grid; gap:10px}
 .form .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
 .form .btns{display:flex; gap:8px; margin-top:6px}
@@ -74,5 +82,12 @@ input:focus, select:focus, textarea:focus{border-color:var(--primary); box-shado
   .kpis{grid-template-columns:1fr 1fr}
   .grid{grid-template-columns:1fr}
   .two-col{grid-template-columns:1fr}
-  canvas{height:260px !important}
+  canvas{height:240px !important}
+  .btn{width:100%}
+}
+
+@media (max-width:600px){
+  .kpis{grid-template-columns:1fr}
+  .header-filters label.small{min-width:140px}
+  .title h1{font-size:16px}
 }
