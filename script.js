@@ -1,8 +1,6 @@
-// Dashboard Adequações Civis v1.4
-// - Almoço modo "por_pessoa": (prof + ajud) * R$/almoço
-// - Aba Fornecedores (cadastro/normalização + unificar lançamentos)
-// - Exportar PDF (window.print com layout de impressão)
-// - CSV simétrico export/import (backup)
+// Dashboard Adequações Civis v1.4.1
+// Fix: navegação por abas com delegação (Fornecedores funcionando)
+// Mantém v1.4: almoço "por pessoa", cadastro de fornecedores, PDF, CSV backup simétrico
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -13,13 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let cfg  = JSON.parse(localStorage.getItem(CFG_KEY) || JSON.stringify({
     prof: 809, ajud: 405,
-    almoco: 45,             // R$ por pessoa
+    almoco: 45,
     almoco_mode: 'por_pessoa', // 'por_pessoa' | 'qtd' | 'valor'
     mult_sab: 1.5, mult_dom: 2.0
   }));
   let lanc = JSON.parse(localStorage.getItem(KEY) || '[]');
   let ofs  = JSON.parse(localStorage.getItem(OF_KEY)  || '[]');
-  let sups = JSON.parse(localStorage.getItem(SUP_KEY) || '[]'); // [{id,name,aliases:[]}]
+  let sups = JSON.parse(localStorage.getItem(SUP_KEY) || '[]');
   const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
   const q  = (s)=>document.querySelector(s);
@@ -31,14 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   };
-
   function persistAll(){ localStorage.setItem(KEY, JSON.stringify(lanc)); localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); localStorage.setItem(OF_KEY, JSON.stringify(ofs)); localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
   function persistLanc(){ localStorage.setItem(KEY, JSON.stringify(lanc)); }
   function persistCfg(){ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
   function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
   function persistSup(){ localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
 
-  // ---------- Fornecedores: normalização ----------
+  // --------- Fornecedores (normalização/aliases) ----------
   const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
   function canonicalSupplierName(input){
     const clean = normalize(input);
@@ -47,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(normalize(s.name)===clean) return s.name;
       if((s.aliases||[]).some(a=> normalize(a)===clean)) return s.name;
     }
-    return input.trim(); // se não achar, devolve como veio
+    return (input||'').trim();
   }
   function ensureSupFromLanc(){
     const names = [...new Set(lanc.map(l=> (l.fornecedor||'').trim()).filter(Boolean))];
@@ -59,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     persistSup();
   }
 
-  // ---------- Cálculos ----------
+  // --------- Cálculos ----------
   function fatorDia(tipo){
     if (tipo === 'sabado') return +cfg.mult_sab || 1.5;
     if (tipo === 'domingo') return +cfg.mult_dom || 2.0;
@@ -69,9 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const ppl = (+l.profissionais||0) + (+l.ajudantes||0);
     const v = +l.almoco||0;
     const mode = cfg.almoco_mode || 'por_pessoa';
-    if(mode==='valor') return v;                                 // valor total R$
-    if(mode==='qtd')   return v * ppl * (+cfg.almoco||0);        // qtd × pessoas × R$
-    return ppl * (+cfg.almoco||0);                               // por pessoa (IGNORA campo almoco)
+    if(mode==='valor') return v;
+    if(mode==='qtd')   return v * ppl * (+cfg.almoco||0);
+    return ppl * (+cfg.almoco||0); // por pessoa (ignora campo almoco)
   }
   function gastoLanc(l){
     const f = fatorDia(l.tipo_dia||'util');
@@ -79,22 +76,24 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0) + mo + almocoTotalDe(l) + (+l.translado||0);
   }
 
-  // ---------- Abas ----------
-  qa('button[data-tab]').forEach(b=>{
-    if(!b.getAttribute('type')) b.setAttribute('type','button');
-    b.addEventListener('click',()=>{
-      qa('.tab').forEach(t=>t.classList.remove('active'));
-      const tgt = q('#'+b.dataset.tab);
-      if(tgt) tgt.classList.add('active');
-      if(b.dataset.tab==='dashboard') renderAll();
-      if(b.dataset.tab==='lancamentos'){ ensureTipoDiaField(); ensureFornecedorDatalist(); fillOFSelects(); }
-      if(b.dataset.tab==='ofs'){ renderOFs(); fillOFSelects(); }
-      if(b.dataset.tab==='config') ensureConfigUI();
-      if(b.dataset.tab==='fornecedores') renderSupUI();
-    });
+  // --------- Delegação de eventos para abas (corrige botão dinâmico) ----------
+  document.addEventListener('click', (ev)=>{
+    const b = ev.target.closest('button[data-tab]');
+    if(!b) return;
+    ev.preventDefault();
+    qa('.tab').forEach(t=>t.classList.remove('active'));
+    const id = b.dataset.tab;
+    const tgt = q('#'+id);
+    if(tgt) tgt.classList.add('active');
+
+    if(id==='dashboard') renderAll();
+    if(id==='lancamentos'){ ensureTipoDiaField(); ensureFornecedorDatalist(); fillOFSelects(); }
+    if(id==='ofs'){ renderOFs(); fillOFSelects(); }
+    if(id==='config') ensureConfigUI();
+    if(id==='fornecedores'){ renderSupUI(); }
   });
 
-  // cria a Tab "Fornecedores" se não existe
+  // --------- Injeta aba Fornecedores (se não existir) ----------
   (function injectSuppliersTab(){
     if(!q('button[data-tab="fornecedores"]')){
       const tabs = q('.tabs');
@@ -104,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.dataset.tab = 'fornecedores';
         btn.textContent = 'Fornecedores';
         tabs.appendChild(btn);
-        btn.addEventListener('click', ()=> btn.dispatchEvent(new Event('click'))); // só para estilo
       }
     }
     if(!q('#fornecedores')){
@@ -126,21 +124,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="btn" id="btnUnificar" type="button">Unificar lançamentos</button>
           </div>
         </div>
-        <div style="margin-top:12px">
-          <div id="supList" class="sup-grid"></div>
-        </div>
-        <p class="muted" style="margin-top:10px">Dica: “Unificar lançamentos” substitui todos os nomes/variações pelos nomes cadastrados aqui.</p>
+        <div style="margin-top:12px"><div id="supList" class="sup-grid"></div></div>
+        <p class="muted" style="margin-top:10px">“Unificar lançamentos” substitui variações pelo nome cadastrado.</p>
       `;
       q('main')?.appendChild(m);
     }
-    // re-wire events
-    qa('button[data-tab]').forEach(b=>{
-      if(!b.getAttribute('type')) b.setAttribute('type','button');
-      b.onclick = b.onclick || (()=>{});
-    });
   })();
 
-  // ---------- UI Lançamentos ----------
+  // --------- UI Lançamentos ----------
   function ensureTipoDiaField(){
     if(q('#tipoDia')) return;
     const container = q('#form')?.querySelector('.row2') || q('#form');
@@ -156,19 +147,16 @@ document.addEventListener('DOMContentLoaded', () => {
     container.appendChild(label);
   }
   function ensureFornecedorDatalist(){
-    // cria um datalist para ajudar a padronizar
     if(!q('#fornList')){
       const dl = document.createElement('datalist'); dl.id='fornList';
       document.body.appendChild(dl);
       const inp = q('#fornecedor'); if(inp) inp.setAttribute('list','fornList');
     }
-    const dl = q('#fornList');
-    if(dl){
-      dl.innerHTML = sups.map(s=> `<option value="${s.name}">`).join('');
-    }
+    const dl = q('#fornList'); if(!dl) return;
+    dl.innerHTML = sups.map(s=> `<option value="${s.name}">`).join('');
   }
 
-  // ---------- OFs ----------
+  // --------- OFs ----------
   function renderOFs(){
     const wrap = q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapGastos = {};
@@ -183,12 +171,12 @@ document.addEventListener('DOMContentLoaded', () => {
       card.innerHTML = `
         <div class="head">
           <div>
-            <div style="font-weight:700">${escapeHtml(of.id)}</div>
-            <div class="muted">${escapeHtml(of.cliente||'')}</div>
+            <div style="font-weight:700">${of.id}</div>
+            <div class="muted">${of.cliente||''}</div>
           </div>
           <div><span class="pill">Orçado: ${orc?BRL.format(orc):'—'}</span></div>
         </div>
-        <div style="margin-top:8px">${of.desc?('<span class="muted">'+escapeHtml(of.desc)+'</span>'):'<span class="muted">Sem descrição</span>'}</div>
+        <div class="muted" style="margin-top:8px">${of.desc||'Sem descrição'}</div>
         <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
           <span class="pill">Gasto: <b>${BRL.format(gasto)}</b></span>
           <span class="pill ${saldo<0?'tag-danger':(pct>=80?'tag-warn':'')}">Saldo: <b>${BRL.format(saldo)}</b></span>
@@ -229,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ---------- Lançamentos ----------
+  // --------- Lançamentos ----------
   const form = q('#form');
   if(form){
     form.addEventListener('submit', (e)=>{
@@ -242,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const materiais = num(q('#materiais')?.value||0);
       const profissionais = num(q('#profissionais')?.value||0);
       const ajudantes = num(q('#ajudantes')?.value||0);
-      const almocoInput = num(q('#almoco')?.value||0); // ignorado se modo 'por_pessoa'
+      const almocoInput = num(q('#almoco')?.value||0); // ignorado se 'por_pessoa'
       const translado = num(q('#translado')?.value||0);
       const tipo_dia = (q('#tipoDia')?.value)||'util';
 
@@ -250,13 +238,13 @@ document.addEventListener('DOMContentLoaded', () => {
       ensureSupFromLanc();
       persistAll();
       form.reset();
-      const td = q('#tipoDia'); if(td) td.value = tipo_dia; // mantém seleção
+      const td = q('#tipoDia'); if(td) td.value = tipo_dia;
       alert('Lançamento adicionado.');
       renderAll();
     });
   }
 
-  // ---------- Config ----------
+  // --------- Config + PDF ----------
   function ensureConfigUI(){
     const formCfg = q('#config .form') || q('#config');
     const addNum = (id, label, step='0.01')=>{
@@ -282,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
       formCfg?.insertBefore(wrap, formCfg.querySelector('.btns') || formCfg.lastChild);
     }
 
-    // set values
     const setVal = (id, val)=>{ const el=q('#'+id); if(el) el.value = val }
     setVal('cfgProf', cfg.prof ?? 809);
     setVal('cfgAjud', cfg.ajud ?? 405);
@@ -305,7 +292,6 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     }
 
-    // Botão Exportar PDF (inserido na toolbar do dashboard, se existir)
     if(!q('#btnExportPDF')){
       const tb = q('.toolbar');
       if(tb){
@@ -319,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   ensureConfigUI();
 
-  // ---------- Fornecedores UI ----------
+  // --------- Fornecedores UI ----------
   function renderSupUI(){
     ensureSupFromLanc();
     const list = q('#supList'); if(!list) return;
@@ -336,7 +322,6 @@ document.addEventListener('DOMContentLoaded', () => {
       list.appendChild(div);
     });
 
-    // add
     const btnAdd = q('#btnAddSup'), iNome=q('#supNome'), iAliases=q('#supAliases');
     if(btnAdd){
       btnAdd.onclick = ()=>{
@@ -347,36 +332,23 @@ document.addEventListener('DOMContentLoaded', () => {
         persistSup(); iNome.value=''; iAliases.value=''; renderSupUI(); ensureFornecedorDatalist();
       };
     }
-
-    // delete
     list.querySelectorAll('[data-delsup]').forEach(b=>{
-      b.onclick = ()=>{
-        const id=b.dataset.delsup;
-        sups = sups.filter(s=> s.id!==id);
-        persistSup(); renderSupUI(); ensureFornecedorDatalist();
-      };
+      b.onclick = ()=>{ sups = sups.filter(s=> s.id!==b.dataset.delsup); persistSup(); renderSupUI(); ensureFornecedorDatalist(); };
     });
-
-    // edit (simples: repõe nos inputs para regravar)
     list.querySelectorAll('[data-editsup]').forEach(b=>{
       b.onclick = ()=>{
-        const s = sups.find(x=>x.id===b.dataset.editsup);
-        if(!s) return;
+        const s = sups.find(x=>x.id===b.dataset.editsup); if(!s) return;
         q('#supNome').value = s.name;
         q('#supAliases').value = (s.aliases||[]).join(', ');
-        // ao salvar, tratamos como "novo" e removemos antigo se o nome mudar
         sups = sups.filter(x=>x.id!==s.id);
         persistSup(); renderSupUI(); ensureFornecedorDatalist();
       };
     });
 
-    // unificar
     const btnUni = q('#btnUnificar');
     if(btnUni){
       btnUni.onclick = ()=>{
-        lanc.forEach(l=>{
-          l.fornecedor = canonicalSupplierName(l.fornecedor||'');
-        });
+        lanc.forEach(l=>{ l.fornecedor = canonicalSupplierName(l.fornecedor||''); });
         persistLanc();
         alert('Lançamentos unificados pelos fornecedores cadastrados.');
         renderAll(); renderSupUI();
@@ -384,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ---------- Filtros ----------
+  // --------- Filtros ----------
   const btnFiltrar = q('#btnFiltrar'); if(btnFiltrar) btnFiltrar.onclick = ()=> renderAll();
   const btnLimpar = q('#btnLimpar');
   if(btnLimpar){
@@ -396,19 +368,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ---------- CSV (backup simétrico) ----------
-  // Cabeçalho único: of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado,tipo_dia
+  // --------- CSV (backup simétrico) ----------
   const CSV_HEAD = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
 
   const btnExportar = q('#btnExportar');
   if(btnExportar){
     btnExportar.onclick = ()=>{
       const rows = [CSV_HEAD];
-      lanc.forEach(l=> rows.push([
-        l.of_id, l.data, l.fornecedor||'',
-        l.materiais, l.profissionais, l.ajudantes,
-        l.almoco, l.translado, l.tipo_dia||'util'
-      ]));
+      lanc.forEach(l=> rows.push([l.of_id,l.data,l.fornecedor||'',l.materiais,l.profissionais,l.ajudantes,l.almoco,l.translado,l.tipo_dia||'util']));
       const csv = rows.map(r=> r.map(v=>{
         const s = (v==null?'':String(v));
         return /[",;\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
@@ -421,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const inputCSV = q('#inputCSV');
   if(inputCSV){
-    inputCSV.removeAttribute('accept'); // compat mobile
+    inputCSV.removeAttribute('accept');
     inputCSV.addEventListener('change', async (e)=>{
       const file = e.target.files[0]; if(!file) return;
       await handleCsvFile(file);
@@ -437,10 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!lines.length) return;
       const head = splitCsv(lines.shift());
       const map = CSV_HEAD.map(h=> head.indexOf(h));
-      if(map.some(i=> i<0)){
-        alert('Cabeçalho CSV inválido. Esperado: ' + CSV_HEAD.join(','));
-        return;
-      }
+      if(map.some(i=> i<0)){ alert('Cabeçalho CSV inválido. Esperado: ' + CSV_HEAD.join(',')); return; }
       const imported=[];
       lines.forEach(line=>{
         if(!line.trim()) return;
@@ -458,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
           tipo_dia: (c[map[8]]||'util').trim().toLowerCase()
         });
       });
-      lanc = imported; // backup total (substitui)
+      lanc = imported;
       ensureSupFromLanc();
       persistAll();
       alert('Backup restaurado com sucesso!');
@@ -480,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return out.map(s=>s.trim());
   }
 
-  // ---------- Agregadores / Tabela / KPIs / Gráficos ----------
+  // --------- Agregadores / Tabela / KPIs / Gráficos ----------
   function filtrarDados(){
     const sel = q('#selOF')?.value || '__ALL__';
     const de = q('#fDe')?.value || null;
@@ -550,7 +514,6 @@ document.addEventListener('DOMContentLoaded', () => {
     set('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
   }
 
-  // gráficos: fornecedor soma apenas Materiais, usando nome canônico
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
     const byDate = {}; rows.forEach(r=>{ const k=r.data||'—'; byDate[k]=(byDate[k]||0)+gastoLanc(r); });
@@ -570,24 +533,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     [chEvo,chCat,chForn].forEach(ch=> ch && ch.destroy());
-
     const e1 = q('#graficoEvolucao'); if(e1){
-      chEvo = new Chart(e1.getContext('2d'), {
-        type:'line',
+      chEvo = new Chart(e1.getContext('2d'), { type:'line',
         data:{ labels:Object.keys(byDate), datasets:[{ label:'Total por dia', data:Object.values(byDate), tension:.25 }]},
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
       });
     }
     const e2 = q('#graficoCategorias'); if(e2){
-      chCat = new Chart(e2.getContext('2d'), {
-        type:'doughnut',
+      chCat = new Chart(e2.getContext('2d'), { type:'doughnut',
         data:{ labels:Object.keys(cat), datasets:[{ data:Object.values(cat) }]},
         options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
       });
     }
     const e3 = q('#graficoFornecedores'); if(e3){
-      chForn = new Chart(e3.getContext('2d'), {
-        type:'bar',
+      chForn = new Chart(e3.getContext('2d'), { type:'bar',
         data:{ labels:Object.keys(byForn), datasets:[{ label:'Materiais por fornecedor', data:Object.values(byForn) }]},
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
       });
@@ -604,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // ---------- Seeds (opcionais) ----------
+  // Seeds (opcionais)
   if(ofs.length===0){
     ofs = [
       {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
