@@ -1,14 +1,11 @@
-// Dashboard Adequações Civis v1.4.2
-// - Fix botão "Apagar todas as OFs"
-// - Entradas monetárias com máscara BRL (config, OF orçado, materiais, translado)
-// - Filtros revisados (OF, período, fornecedor canônico)
-// - Mantém: fornecedores (aba + unificação), PDF, CSV backup simétrico,
-//   almoço por pessoa, multiplicadores fim de semana, gráficos e KPIs.
+// Dashboard Adequações Civis v1.4.3
+// Fix: Aba CONFIG completa (campos + máscaras BRL + salvar) e persistência
+// Mantém v1.4.2: fornecedores, PDF, CSV backup, almoço por pessoa, fds, filtros, etc.
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const KEY = 'adq_civis_lancamentos_v14';
-  const CFG_KEY = 'adq_civis_cfg_v14_2';
+  const CFG_KEY = 'adq_civis_cfg_v14_3';
   const OF_KEY = 'adq_civis_ofs_v11';
   const SUP_KEY = 'adq_civis_suppliers_v14';
 
@@ -27,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
-  // converte "R$ 125.250,00" -> 125250
+  // ---- parser BRL -> número (aceita "R$ 125.250,00") ----
   const num = (v)=> {
     if (v==null) return 0;
     const s = String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
@@ -41,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
   function persistSup(){ localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
 
-  // ------ Fornecedores: normalização/aliases ------
+  // --------- Fornecedores (normalização) ----------
   const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
   function canonicalSupplierName(input){
     const clean = normalize(input);
@@ -62,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     persistSup();
   }
 
-  // ------ Cálculos ------
+  // --------- Cálculos ----------
   function fatorDia(tipo){
     if (tipo === 'sabado') return +cfg.mult_sab || 1.5;
     if (tipo === 'domingo') return +cfg.mult_dom || 2.0;
@@ -82,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0) + mo + almocoTotalDe(l) + (+l.translado||0);
   }
 
-  // ------ Abas (delegação) ------
+  // --------- Abas (delegação) ----------
   document.addEventListener('click', (ev)=>{
     const b = ev.target.closest('button[data-tab]');
     if(!b) return;
@@ -95,11 +92,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if(id==='dashboard') renderAll();
     if(id==='lancamentos'){ ensureTipoDiaField(); ensureFornecedorDatalist(); fillOFSelects(); applyMoneyMasks(); }
     if(id==='ofs'){ renderOFs(); fillOFSelects(); ensureResetBtn(); applyMoneyMasks(); }
-    if(id==='config') { ensureConfigUI(); applyMoneyMasks(); }
+    if(id==='config') { ensureConfigUI(true); applyMoneyMasks(); }
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
-  // injeta a tab de fornecedores se necessário
+  // injeta a tab Fornecedores se precisar
   (function injectSuppliersTab(){
     if(!q('button[data-tab="fornecedores"]')){
       const tabs = q('.tabs');
@@ -137,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  // ------ UI Lançamentos ------
+  // --------- UI Lançamentos ----------
   function ensureTipoDiaField(){
     if(q('#tipoDia')) return;
     const container = q('#form')?.querySelector('.row2') || q('#form');
@@ -158,24 +155,20 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.appendChild(dl);
       const inp = q('#fornecedor'); if(inp) inp.setAttribute('list','fornList');
     }
-    const dl = q('#fornList');
-    if(dl){ dl.innerHTML = sups.map(s=> `<option value="${s.name}">`).join(''); }
+    const dl = q('#fornList'); if(dl) dl.innerHTML = sups.map(s=> `<option value="${s.name}">`).join('');
   }
 
-  // ------ Máscara BRL ------
+  // --------- Máscara BRL ----------
   function formatInputBRL(el){
     el.classList.add('money');
     const apply = ()=>{
-      let v = (el.value||'').toString();
-      // se já vem no formato "R$ x", apenas normaliza separadores
-      v = v.replace(/[^0-9]/g,'');
+      let v = (el.value||'').toString().replace(/[^0-9]/g,'');
       if(!v){ el.value=''; return; }
-      v = (parseInt(v,10)/100).toFixed(2); // 125250 -> "1252.50"
+      v = (parseInt(v,10)/100).toFixed(2);
       v = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
       el.value = 'R$ '+v;
     };
     el.addEventListener('input', apply);
-    // aplica uma vez se houver valor
     if(el.value) apply();
   }
   function applyMoneyMasks(){
@@ -184,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ------ OFs ------
+  // --------- OFs ----------
   function renderOFs(){
     const wrap = q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapGastos = {};
@@ -217,9 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
     ensureResetBtn();
   }
   function ensureResetBtn(){
-    // Garante o botão "Apagar todas as OFs" na aba OFs (id: btnResetOFs)
     if(!q('#btnResetOFs')){
-      const cont = q('#ofs'); // seção da aba OFs
+      const cont = q('#ofs');
       const holder = cont?.querySelector('.toolbar') || cont;
       if(holder){
         const b = document.createElement('button');
@@ -260,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!id) return alert('Informe o Nº/ID da OF.');
       if(ofs.some(o=>o.id===id)) return alert('Já existe uma OF com esse ID.');
       const cliente=(q('#ofCliente')?.value||'').trim();
-      const orcado= num(q('#ofOrcado')?.value||0); // mascara -> num()
+      const orcado= num(q('#ofOrcado')?.value||0);
       const desc=(q('#ofDesc')?.value||'').trim();
       ofs.push({id, cliente, orcado, desc});
       persistOFs();
@@ -270,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ------ Lançamentos ------
+  // --------- Lançamentos ----------
   const form = q('#form');
   if(form){
     form.addEventListener('submit', (e)=>{
@@ -280,11 +272,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = q('#data')?.value || '';
       const fornecedorRaw = (q('#fornecedor')?.value||'').trim();
       const fornecedor = canonicalSupplierName(fornecedorRaw);
-      const materiais = num(q('#materiais')?.value||0); // aceita "R$ x"
+      const materiais = num(q('#materiais')?.value||0);
       const profissionais = parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,'')) || 0;
       const ajudantes    = parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,'')) || 0;
-      const almocoInput  = num(q('#almoco')?.value||0); // ignorado no modo 'por_pessoa'
-      const translado    = num(q('#translado')?.value||0); // aceita "R$ x"
+      const almocoInput  = num(q('#almoco')?.value||0);
+      const translado    = num(q('#translado')?.value||0);
       const tipo_dia     = (q('#tipoDia')?.value)||'util';
 
       lanc.push({ id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia });
@@ -297,53 +289,71 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ------ Config + PDF ------
-  function ensureConfigUI(){
-    const formCfg = q('#config .form') || q('#config');
-    const addNum = (id, label)=>{
+  // --------- CONFIG (injeção garantida) ----------
+  function ensureConfigUI(forceOpen=false){
+    const cont = q('#config'); if(!cont) return;
+    // se não há form, cria um
+    let formCfg = cont.querySelector('.form');
+    if(!formCfg){
+      formCfg = document.createElement('div');
+      formCfg.className = 'form';
+      cont.appendChild(formCfg);
+    }
+    // helper para criar campo money
+    const addMoney = (id,label)=>{
       if(q('#'+id)) return;
       const w = document.createElement('label'); w.className='small';
       w.innerHTML = `${label}<input type="text" id="${id}" class="money" />`;
-      formCfg?.insertBefore(w, formCfg.querySelector('.btns') || formCfg.lastChild);
+      formCfg.appendChild(w);
     };
-    addNum('cfgProf','R$/profissional (dias úteis)');
-    addNum('cfgAjud','R$/ajudante (dias úteis)');
-    addNum('cfgAlmoco','R$/almoço (por pessoa)');
-
-    if(!q('#cfgMultSab')){
+    // helper para criar number
+    const addNumber = (id,label,step='0.01')=>{
+      if(q('#'+id)) return;
       const w = document.createElement('label'); w.className='small';
-      w.innerHTML = `Multiplicador sábado (ex.: 1,5)
-        <input type="number" id="cfgMultSab" step="0.01" min="0" />`;
-      formCfg?.insertBefore(w, formCfg.querySelector('.btns') || formCfg.lastChild);
-    }
-    if(!q('#cfgMultDom')){
+      w.innerHTML = `${label}<input type="number" id="${id}" step="${step}" min="0" />`;
+      formCfg.appendChild(w);
+    };
+    // helper select
+    const addSelectMode = ()=>{
+      if(q('#cfgAlmocoMode')) return;
       const w = document.createElement('label'); w.className='small';
-      w.innerHTML = `Multiplicador domingo/feriado (ex.: 2,0)
-        <input type="number" id="cfgMultDom" step="0.01" min="0" />`;
-      formCfg?.insertBefore(w, formCfg.querySelector('.btns') || formCfg.lastChild);
-    }
-
-    if(!q('#cfgAlmocoMode')){
-      const wrap = document.createElement('label'); wrap.className='small';
-      wrap.innerHTML = `Almoço interpreta entrada como
+      w.innerHTML = `Almoço interpreta entrada como
         <select id="cfgAlmocoMode">
           <option value="por_pessoa">Por pessoa (ignora campo)</option>
           <option value="qtd">Quantidade de dias (qtd × pessoas × R$)</option>
           <option value="valor">Valor total (R$)</option>
         </select>`;
-      formCfg?.insertBefore(wrap, formCfg.querySelector('.btns') || formCfg.lastChild);
+      formCfg.appendChild(w);
+    };
+    // botão salvar
+    if(!q('#btnSalvarCfg')){
+      const btns = document.createElement('div');
+      btns.className='btns';
+      btns.innerHTML = `<button class="btn primary" id="btnSalvarCfg" type="button">Salvar</button>`;
+      formCfg.appendChild(btns);
     }
 
-    // valores atuais -> inputs (formata em R$ nos money)
+    // criar campos
+    addMoney('cfgProf','R$/profissional (dias úteis)');
+    addMoney('cfgAjud','R$/ajudante (dias úteis)');
+    addMoney('cfgAlmoco','R$/almoço (por pessoa)');
+    addNumber('cfgMultSab','Multiplicador sábado (ex.: 1,5)');
+    addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
+    addSelectMode();
+
+    // setar valores atuais
     const setMoney = (id, v)=>{ const el=q('#'+id); if(el){ el.value = BRL.format(+v||0); } };
     setMoney('cfgProf', cfg.prof);
     setMoney('cfgAjud', cfg.ajud);
     setMoney('cfgAlmoco', cfg.almoco);
     const ms=q('#cfgMultSab'); if(ms) ms.value = cfg.mult_sab ?? 1.5;
     const md=q('#cfgMultDom'); if(md) md.value = cfg.mult_dom ?? 2.0;
-    const im = q('#cfgAlmocoMode'); if(im) im.value = cfg.almoco_mode || 'por_pessoa';
+    const im=q('#cfgAlmocoMode'); if(im) im.value = cfg.almoco_mode || 'por_pessoa';
 
-    // botão salvar
+    // máscara BRL
+    applyMoneyMasks();
+
+    // salvar
     const btnSalvar = q('#btnSalvarCfg');
     if(btnSalvar && !btnSalvar.dataset.bound){
       btnSalvar.dataset.bound='1';
@@ -355,11 +365,12 @@ document.addEventListener('DOMContentLoaded', () => {
         cfg.mult_dom     = parseFloat(q('#cfgMultDom')?.value||2.0);
         cfg.almoco_mode  = (q('#cfgAlmocoMode')?.value)||'por_pessoa';
         persistCfg();
+        if(forceOpen) alert('Configurações salvas.');
         renderAll();
       };
     }
 
-    // botão Exportar PDF
+    // Botão Exportar PDF (se ainda não tiver)
     if(!q('#btnExportPDF')){
       const tb = q('.toolbar');
       if(tb){
@@ -373,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   ensureConfigUI();
 
-  // ------ Fornecedores UI ------
+  // --------- Fornecedores UI ----------
   function renderSupUI(){
     ensureSupFromLanc();
     const list = q('#supList'); if(!list) return;
@@ -424,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ------ Filtros ------
+  // --------- Filtros ----------
   const btnFiltrar = q('#btnFiltrar'); if(btnFiltrar) btnFiltrar.onclick = ()=> renderAll();
   const btnLimpar = q('#btnLimpar');
   if(btnLimpar){
@@ -436,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ------ CSV (backup simétrico) ------
+  // --------- CSV (backup simétrico) ----------
   const CSV_HEAD = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
 
   const btnExportar = q('#btnExportar');
@@ -490,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
           tipo_dia: (c[map[8]]||'util').trim().toLowerCase()
         });
       });
-      lanc = imported; // restauração total
+      lanc = imported;
       ensureSupFromLanc();
       persistAll();
       alert('Backup restaurado com sucesso!');
@@ -512,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return out.map(s=>s.trim());
   }
 
-  // ------ Agregadores / Tabela / KPIs / Gráficos ------
+  // --------- Agregadores / Tabela / KPIs / Gráficos ----------
   function filtrarDados(){
     const sel = q('#selOF')?.value || '__ALL__';
     const de = q('#fDe')?.value || null;
@@ -582,7 +593,6 @@ document.addEventListener('DOMContentLoaded', () => {
     set('#kpiHh', `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`);
     set('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
 
-    // Pílulas Orçado/Saldo, respeitando OF selecionada
     const pillOrcado = q('#pillOrcado'), pillSaldo = q('#pillSaldo');
     if(pillOrcado && pillSaldo){
       const sel = q('#selOF')?.value || '__ALL__';
