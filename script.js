@@ -1,8 +1,8 @@
-// Dashboard Adequações Civis v1.2.2 — import CSV robusto + ajustes anteriores
+// Dashboard Adequações Civis v1.3 — import mobile/desktop + drag&drop + ajustes anteriores
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const KEY = 'adq_civis_lancamentos_v11';
-  const CFG_KEY = 'adq_civis_cfg_v12';   // inclui cfg.almoco
+  const CFG_KEY = 'adq_civis_cfg_v13';   // inclui cfg.almoco; bump p/ v13
   const OF_KEY = 'adq_civis_ofs_v11';
 
   let cfg  = JSON.parse(localStorage.getItem(CFG_KEY) || '{"prof":809,"ajud":405,"almoco":35}');
@@ -12,10 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const q  = (s)=>document.querySelector(s);
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
-
   const num = (v)=> {
     if (v==null) return 0;
-    // remove R$, espaços, milhar, troca vírgula decimal
     const s = String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
     const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
@@ -203,76 +201,85 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ---------- CSV (robusto) ----------
-  const btnExportar = q('#btnExportar');
-  if(btnExportar){
-    btnExportar.onclick = ()=>{
-      const rows = [['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado']];
-      lanc.forEach(l=> rows.push([l.of_id,l.data,l.fornecedor,l.materiais,l.profissionais,l.ajudantes,l.almoco,l.translado]));
-      const csv = rows.map(r=>r.map(v=> typeof v==='string' && /[,;"]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v).join(',')).join('\n');
-      const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = 'adequacoes_civis_v122.csv'; a.click();
-    };
-  }
-
+  // ---------- CSV: aceitar qualquer arquivo (resolve iOS/Android) + drag&drop ----------
   const inputCSV = q('#inputCSV');
   if(inputCSV){
-    inputCSV.addEventListener('change', async (e)=>{
-      try{
-        const file = e.target.files[0]; if(!file) return;
-        let txt = await file.text();
-        if (txt.charCodeAt(0) === 0xFEFF) txt = txt.slice(1); // remove BOM
+    // remover filtros de tipo para que o SO permita selecionar (celular/desktop)
+    inputCSV.removeAttribute('accept');
 
-        // detecta delimitador preferindo o que tiver mais colunas na primeira linha
-        const first = txt.split(/\r?\n/)[0] || '';
-        const delim = (first.split(';').length > first.split(',').length) ? ';' : ',';
+    // drag & drop (injetado perto do botão de importar)
+    const toolbar = inputCSV.closest('.toolbar') || inputCSV.parentElement || document.body;
+    const dz = document.createElement('div');
+    dz.className = 'dropzone';
+    dz.textContent = 'Arraste e solte o CSV aqui (ou toque para escolher)';
+    dz.style.cursor = 'pointer';
+    toolbar.appendChild(dz);
 
-        const lines = txt.trim().split(/\r?\n/);
-        const head = lines.shift().split(delim).map(s=> s.trim().toLowerCase());
-        const idx = (k)=> head.indexOf(k);
-        // mapeia variações comuns de cabeçalho
-        const need = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado'];
-        // tolerância: "of", "ordem", "obra" mapeando para of_id
-        if(idx('of_id')<0){
-          const alt = ['of','ordem','ordem de fabricação','obra','centro de custo'];
-          for(const a of alt){ const p = idx(a); if(p>=0){ head[p] = 'of_id'; break; } }
-        }
-
-        const missing = need.filter(k=> idx(k)<0);
-        if(missing.length){
-          alert('Cabeçalho CSV faltando: '+missing.join(', ')+'\nUse: '+need.join(delim));
-          console.error('Head lido:', head);
-          return;
-        }
-
-        lines.forEach(line=>{
-          if(!line.trim()) return;
-          const cols = parseCsvLine(line, delim);
-          const rec = {
-            of_id: (cols[idx('of_id')]||'').trim(),
-            data: (cols[idx('data')]||'').trim(),
-            fornecedor: (cols[idx('fornecedor')]||'').trim(),
-            materiais: num(cols[idx('materiais')]),
-            profissionais: num(cols[idx('profissionais')]),
-            ajudantes: num(cols[idx('ajudantes')]),
-            almoco: num(cols[idx('almoco')]),      // quantidade (dias)
-            translado: num(cols[idx('translado')]),
-          };
-          lanc.push(rec);
-        });
-        persistLanc();
-        e.target.value='';
-
-        // garantir OFs
-        const idsUsados = [...new Set(lanc.map(l=>l.of_id).filter(Boolean))];
-        idsUsados.forEach(id=>{ if(!ofs.some(o=>o.id===id)){ ofs.push({id, cliente:'', orcado:0, desc:''}); } });
-        persistOFs(); fillOFSelects(); renderOFs(); renderAll();
-        alert('Importação concluída com sucesso!');
-      }catch(err){
-        console.error('Erro na importação CSV:', err);
-        alert('Não foi possível importar o CSV. Veja o console para detalhes.');
-      }
+    dz.addEventListener('click', ()=> inputCSV.click());
+    ;['dragenter','dragover'].forEach(ev=> dz.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); dz.classList.add('drag'); }));
+    ;['dragleave','drop'].forEach(ev=> dz.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag'); }));
+    dz.addEventListener('drop', (e)=>{
+      const file = e.dataTransfer.files?.[0]; if(!file) return;
+      handleCsvFile(file);
     });
+
+    inputCSV.addEventListener('change', async (e)=>{
+      const file = e.target.files[0]; if(!file) return;
+      await handleCsvFile(file);
+      inputCSV.value='';
+    });
+  }
+
+  async function handleCsvFile(file){
+    try{
+      let txt = await file.text();
+      if (txt.charCodeAt(0) === 0xFEFF) txt = txt.slice(1);
+
+      const first = txt.split(/\r?\n/)[0] || '';
+      const delim = (first.split(';').length > first.split(',').length) ? ';' : ',';
+
+      const lines = txt.trim().split(/\r?\n/);
+      const head = lines.shift().split(delim).map(s=> s.trim().toLowerCase());
+      const idx = (k)=> head.indexOf(k);
+
+      const need = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado'];
+      if(idx('of_id')<0){
+        const alt = ['of','ordem','ordem de fabricação','obra','centro de custo'];
+        for(const a of alt){ const p = idx(a); if(p>=0){ head[p] = 'of_id'; break; } }
+      }
+      const missing = need.filter(k=> idx(k)<0);
+      if(missing.length){
+        alert('Cabeçalho CSV faltando: '+missing.join(', ')+'\nUse: '+need.join(delim));
+        console.error('Head lido:', head);
+        return;
+      }
+
+      lines.forEach(line=>{
+        if(!line.trim()) return;
+        const cols = parseCsvLine(line, delim);
+        const rec = {
+          of_id: (cols[idx('of_id')]||'').trim(),
+          data: (cols[idx('data')]||'').trim(),
+          fornecedor: (cols[idx('fornecedor')]||'').trim(),
+          materiais: num(cols[idx('materiais')]),
+          profissionais: num(cols[idx('profissionais')]),
+          ajudantes: num(cols[idx('ajudantes')]),
+          almoco: num(cols[idx('almoco')]),      // quantidade (dias)
+          translado: num(cols[idx('translado')]),
+        };
+        lanc.push(rec);
+      });
+      persistLanc();
+
+      // garantir OFs
+      const idsUsados = [...new Set(lanc.map(l=>l.of_id).filter(Boolean))];
+      idsUsados.forEach(id=>{ if(!ofs.some(o=>o.id===id)){ ofs.push({id, cliente:'', orcado:0, desc:''}); } });
+      persistOFs(); fillOFSelects(); renderOFs(); renderAll();
+      alert('Importação concluída com sucesso!');
+    }catch(err){
+      console.error('Erro na importação CSV:', err);
+      alert('Não foi possível importar o CSV. Veja o console para detalhes.');
+    }
   }
 
   function parseCsvLine(s, delim){
@@ -287,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return out.map(x=>x.trim());
   }
 
-  // ---------- Agregadores / tabelas / kpis ----------
+  // ---------- Agregadores / Tabela / KPIs ----------
   function filtrarDados(){
     const sel = q('#selOF')?.value || '__ALL__';
     const de = q('#fDe')?.value || null;
@@ -364,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ---------- Gráficos ----------
+  // ---------- Gráficos (fornecedor só Materiais) ----------
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
     const byDate = {}; rows.forEach(r=>{ const k=r.data||'—'; byDate[k]=(byDate[k]||0)+gastoLanc(r); });
