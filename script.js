@@ -1,11 +1,11 @@
-// Dashboard Adequações Civis v1.3 — import mobile/desktop + drag&drop + ajustes anteriores
+// Dashboard Adequações Civis v1.3.1 — correção de somas (modo do Almoço) + delete por ID
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const KEY = 'adq_civis_lancamentos_v11';
-  const CFG_KEY = 'adq_civis_cfg_v13';   // inclui cfg.almoco; bump p/ v13
+  const CFG_KEY = 'adq_civis_cfg_v13_1';  // novo: cfg.almoco_mode
   const OF_KEY = 'adq_civis_ofs_v11';
 
-  let cfg  = JSON.parse(localStorage.getItem(CFG_KEY) || '{"prof":809,"ajud":405,"almoco":35}');
+  let cfg  = JSON.parse(localStorage.getItem(CFG_KEY) || '{"prof":809,"ajud":405,"almoco":35,"almoco_mode":"qtd"}');
   let lanc = JSON.parse(localStorage.getItem(KEY) || '[]');
   let ofs  = JSON.parse(localStorage.getItem(OF_KEY)  || '[]');
 
@@ -18,21 +18,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   };
+  const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
   function persistLanc(){ localStorage.setItem(KEY, JSON.stringify(lanc)); }
   function persistCfg(){ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
   function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
 
   function findOF(id){ return ofs.find(o => o.id===id); }
-  // almoço = qtd_dias * (prof+ajud) * cfg.almoco
+
+  // === Cálculo: Almoço pode ser "qtd dias" (qtd×pessoas×R$) ou "valor total (R$)" ===
+  function almocoTotalDe(l){
+    const pessoas = (+l.profissionais||0) + (+l.ajudantes||0);
+    const qtdOuValor = +l.almoco||0;
+    if ((cfg.almoco_mode||'qtd') === 'valor'){
+      return qtdOuValor; // já é o valor total em R$
+    } else {
+      return qtdOuValor * pessoas * (+cfg.almoco||0); // quantidade × pessoas × R$/almoço
+    }
+  }
+
   function gastoLanc(l){
     const mat = +l.materiais||0;
     const mo  = (l.profissionais*cfg.prof) + (l.ajudantes*cfg.ajud);
-    const pessoas = (+l.profissionais||0) + (+l.ajudantes||0);
-    const almocoTotal = (+l.almoco||0) * pessoas * (+cfg.almoco||0);
+    const alm = almocoTotalDe(l);
     const translado = +l.translado||0;
-    return mat + mo + almocoTotal + translado;
+    return mat + mo + alm + translado;
   }
+
   function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
   // ---------- Abas ----------
@@ -148,9 +160,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const materiais = num(q('#materiais')?.value||0);
       const profissionais = num(q('#profissionais')?.value||0);
       const ajudantes = num(q('#ajudantes')?.value||0);
-      const almocoQtd = num(q('#almoco')?.value||0);  // quantidade (dias)
+      const almocoInput = num(q('#almoco')?.value||0);  // quantidade OU valor total
       const translado = num(q('#translado')?.value||0);
-      lanc.push({of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco: almocoQtd, translado});
+
+      lanc.push({
+        id: uid(),
+        of_id, data, fornecedor,
+        materiais, profissionais, ajudantes,
+        almoco: almocoInput, translado
+      });
+
       persistLanc();
       form.reset();
       alert('Lançamento adicionado.');
@@ -158,12 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ---------- Config (inclui R$/almoço por pessoa) ----------
+  // ---------- Config (inclui modo do almoço) ----------
   function ensureConfigUI(){
     const ip = q('#cfgProf'), ia = q('#cfgAjud');
     if(ip) ip.value = cfg.prof ?? 809;
     if(ia) ia.value = cfg.ajud ?? 405;
 
+    // R$/almoço (por pessoa)
     if(!q('#cfgAlmoco')){
       const formCfg = q('#config .form') || q('#config');
       if(formCfg){
@@ -176,12 +196,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const ic = q('#cfgAlmoco'); if(ic) ic.value = cfg.almoco ?? 35;
 
+    // Modo do almoço: quantidade de dias ou valor total
+    if(!q('#cfgAlmocoMode')){
+      const formCfg = q('#config .form') || q('#config');
+      if(formCfg){
+        const wrap = document.createElement('label');
+        wrap.className = 'small';
+        wrap.innerHTML = `Almoço interpreta entrada como
+          <select id="cfgAlmocoMode">
+            <option value="qtd">Quantidade de dias</option>
+            <option value="valor">Valor total (R$)</option>
+          </select>`;
+        formCfg.insertBefore(wrap, formCfg.querySelector('.btns') || formCfg.lastChild);
+      }
+    }
+    const im = q('#cfgAlmocoMode'); if(im) im.value = cfg.almoco_mode || 'qtd';
+
     const btnSalvar = q('#btnSalvarCfg');
     if(btnSalvar){
       btnSalvar.onclick = ()=>{
-        cfg.prof   = num(q('#cfgProf')?.value||0);
-        cfg.ajud   = num(q('#cfgAjud')?.value||0);
-        cfg.almoco = num(q('#cfgAlmoco')?.value||0);
+        cfg.prof         = num(q('#cfgProf')?.value||0);
+        cfg.ajud         = num(q('#cfgAjud')?.value||0);
+        cfg.almoco       = num(q('#cfgAlmoco')?.value||0);
+        cfg.almoco_mode  = (q('#cfgAlmocoMode')?.value)||'qtd';
         persistCfg();
         renderAll();
       };
@@ -201,87 +238,59 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ---------- CSV: aceitar qualquer arquivo (resolve iOS/Android) + drag&drop ----------
+  // ---------- CSV (aceita qualquer arquivo; robusto) ----------
   const inputCSV = q('#inputCSV');
   if(inputCSV){
-    // remover filtros de tipo para que o SO permita selecionar (celular/desktop)
     inputCSV.removeAttribute('accept');
-
-    // drag & drop (injetado perto do botão de importar)
-    const toolbar = inputCSV.closest('.toolbar') || inputCSV.parentElement || document.body;
-    const dz = document.createElement('div');
-    dz.className = 'dropzone';
-    dz.textContent = 'Arraste e solte o CSV aqui (ou toque para escolher)';
-    dz.style.cursor = 'pointer';
-    toolbar.appendChild(dz);
-
-    dz.addEventListener('click', ()=> inputCSV.click());
-    ;['dragenter','dragover'].forEach(ev=> dz.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); dz.classList.add('drag'); }));
-    ;['dragleave','drop'].forEach(ev=> dz.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag'); }));
-    dz.addEventListener('drop', (e)=>{
-      const file = e.dataTransfer.files?.[0]; if(!file) return;
-      handleCsvFile(file);
-    });
-
     inputCSV.addEventListener('change', async (e)=>{
       const file = e.target.files[0]; if(!file) return;
       await handleCsvFile(file);
       inputCSV.value='';
     });
   }
-
   async function handleCsvFile(file){
     try{
       let txt = await file.text();
       if (txt.charCodeAt(0) === 0xFEFF) txt = txt.slice(1);
-
       const first = txt.split(/\r?\n/)[0] || '';
       const delim = (first.split(';').length > first.split(',').length) ? ';' : ',';
-
       const lines = txt.trim().split(/\r?\n/);
       const head = lines.shift().split(delim).map(s=> s.trim().toLowerCase());
       const idx = (k)=> head.indexOf(k);
-
       const need = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado'];
       if(idx('of_id')<0){
         const alt = ['of','ordem','ordem de fabricação','obra','centro de custo'];
         for(const a of alt){ const p = idx(a); if(p>=0){ head[p] = 'of_id'; break; } }
       }
       const missing = need.filter(k=> idx(k)<0);
-      if(missing.length){
-        alert('Cabeçalho CSV faltando: '+missing.join(', ')+'\nUse: '+need.join(delim));
-        console.error('Head lido:', head);
-        return;
-      }
-
+      if(missing.length){ alert('Cabeçalho CSV faltando: '+missing.join(', ')); return; }
       lines.forEach(line=>{
         if(!line.trim()) return;
         const cols = parseCsvLine(line, delim);
         const rec = {
+          id: uid(),
           of_id: (cols[idx('of_id')]||'').trim(),
           data: (cols[idx('data')]||'').trim(),
           fornecedor: (cols[idx('fornecedor')]||'').trim(),
           materiais: num(cols[idx('materiais')]),
           profissionais: num(cols[idx('profissionais')]),
           ajudantes: num(cols[idx('ajudantes')]),
-          almoco: num(cols[idx('almoco')]),      // quantidade (dias)
+          almoco: num(cols[idx('almoco')]),      // quantidade ou valor (conforme modo)
           translado: num(cols[idx('translado')]),
         };
         lanc.push(rec);
       });
       persistLanc();
-
       // garantir OFs
       const idsUsados = [...new Set(lanc.map(l=>l.of_id).filter(Boolean))];
       idsUsados.forEach(id=>{ if(!ofs.some(o=>o.id===id)){ ofs.push({id, cliente:'', orcado:0, desc:''}); } });
       persistOFs(); fillOFSelects(); renderOFs(); renderAll();
       alert('Importação concluída com sucesso!');
     }catch(err){
-      console.error('Erro na importação CSV:', err);
-      alert('Não foi possível importar o CSV. Veja o console para detalhes.');
+      console.error('Import CSV:', err);
+      alert('Não foi possível importar o CSV.');
     }
   }
-
   function parseCsvLine(s, delim){
     const out=[]; let cur=''; let q=false;
     for(let i=0;i<s.length;i++){
@@ -294,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return out.map(x=>x.trim());
   }
 
-  // ---------- Agregadores / Tabela / KPIs ----------
+  // ---------- Agregadores / tabela / KPIs ----------
   function filtrarDados(){
     const sel = q('#selOF')?.value || '__ALL__';
     const de = q('#fDe')?.value || null;
@@ -310,11 +319,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderTable(rows){
     const tb = q('#tabela tbody'); if(!tb) return; tb.innerHTML = '';
-    rows.forEach((l,idx)=>{
+    rows.forEach((l)=>{
       const total = gastoLanc(l);
-      const almocoQtd = +l.almoco||0;
       const pessoas = (+l.profissionais||0)+(+l.ajudantes||0);
-      const almocoTotal = almocoQtd * pessoas * (+cfg.almoco||0);
+      const almTotal = almocoTotalDe(l);
+      const almInfo = (cfg.almoco_mode==='valor')
+        ? `${BRL.format(almTotal)}`
+        : `${l.almoco||0} × ${pessoas} × ${BRL.format(+cfg.almoco||0)} = ${BRL.format(almTotal)}`;
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(l.of_id||'')}</td>
@@ -323,21 +334,27 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${BRL.format(l.materiais||0)}</td>
         <td>${l.profissionais||0}</td>
         <td>${l.ajudantes||0}</td>
-        <td title="qtd x pessoas x R$">${almocoQtd} × ${pessoas} × ${BRL.format(+cfg.almoco||0)} = ${BRL.format(almocoTotal)}</td>
+        <td title="Almoço">${almInfo}</td>
         <td>${BRL.format(l.translado||0)}</td>
         <td><b>${BRL.format(total)}</b></td>
-        <td><button class="btn ghost" data-del="${idx}" type="button">Excluir</button></td>`;
+        <td><button class="btn ghost" data-delid="${l.id||''}" type="button">Excluir</button></td>`;
       tb.appendChild(tr);
     });
-    tb.querySelectorAll('button[data-del]').forEach(b=>{
-      b.onclick = ()=>{ const i = +b.dataset.del; if(confirm('Remover este lançamento?')){ lanc.splice(i,1); persistLanc(); renderAll(); } }
+    tb.querySelectorAll('button[data-delid]').forEach(b=>{
+      b.onclick = ()=>{
+        const id = b.getAttribute('data-delid');
+        const idx = lanc.findIndex(x=>x.id===id);
+        if(idx>=0 && confirm('Remover este lançamento?')){
+          lanc.splice(idx,1); persistLanc(); renderAll();
+        }
+      };
     });
   }
 
   function renderKpis(rows){
     const mat = sum(rows, r=> +r.materiais||0);
     const mo  = sum(rows, r=> r.profissionais*cfg.prof + r.ajudantes*cfg.ajud );
-    const ind = sum(rows, r=> { const qtd=(+r.almoco||0); const ppl=(+r.profissionais||0)+(+r.ajudantes||0); return qtd*ppl*(+cfg.almoco||0) + (+r.translado||0); });
+    const ind = sum(rows, r=> almocoTotalDe(r) + (+r.translado||0));
     const total = mat + mo + ind;
     const set = (sel, v)=>{ const el=q(sel); if(el) el.textContent = v; };
     set('#kpiMateriais', BRL.format(mat));
@@ -348,13 +365,14 @@ document.addEventListener('DOMContentLoaded', () => {
     set('#kpiHh', `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`);
     set('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
 
+    // Orçado/Saldo
     const pillOrcado = q('#pillOrcado'), pillSaldo = q('#pillSaldo');
     if(pillOrcado && pillSaldo){
       const sel = q('#selOF')?.value || '__ALL__';
       let orcado=0, gastoOF=0;
       if(sel && sel!=='__ALL__'){
         const of = findOF(sel); orcado = of ? (+of.orcado||0) : 0;
-        gastoOF = sum(lanc.filter(l=>l.of_id===sel), l=>gastoLanc(l));
+        gastoOF = sum(lanc.filter(l=>l.of_id===sel), l=> gastoLanc(l));
       } else {
         orcado = sum(ofs, o=> +o.orcado||0);
         gastoOF = sum(lanc, l=> gastoLanc(l));
@@ -378,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cat = {
       'Materiais': sum(rows, r=> +r.materiais||0),
       'Mão de Obra': sum(rows, r=> r.profissionais*cfg.prof + r.ajudantes*cfg.ajud ),
-      'Indiretos': sum(rows, r=> { const qtd=(+r.almoco||0); const ppl=(+r.profissionais||0)+(+r.ajudantes||0); return qtd*ppl*(+cfg.almoco||0) + (+r.translado||0); }),
+      'Indiretos': sum(rows, r=> almocoTotalDe(r) + (+r.translado||0)),
     };
     const byForn = {};
     rows.forEach(r=>{
@@ -420,7 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // Seeds opcionais
+  // Seeds opcionais (idem versões anteriores)
   if(ofs.length===0){
     ofs = [
       {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
@@ -430,10 +448,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if(lanc.length===0){
     lanc = [
-      {of_id:'OF-2025-001', data:'2025-09-09', fornecedor:'Bortolaso', materiais:344, profissionais:2, ajudantes:0, almoco:1, translado:25},
-      {of_id:'OF-2025-001', data:'2025-09-10', fornecedor:'',         materiais:0,   profissionais:2, ajudantes:0, almoco:1, translado:25},
-      {of_id:'OF-2025-001', data:'2025-09-15', fornecedor:'Bortolaso', materiais:355, profissionais:2, ajudantes:0, almoco:1, translado:25},
-      {of_id:'OF-2025-002', data:'2025-09-16', fornecedor:'Bortolaso', materiais:86,  profissionais:2, ajudantes:0, almoco:1, translado:25},
+      {id:uid(), of_id:'OF-2025-001', data:'2025-09-09', fornecedor:'Bortolaso', materiais:344, profissionais:2, ajudantes:0, almoco:1, translado:25},
+      {id:uid(), of_id:'OF-2025-001', data:'2025-09-10', fornecedor:'',         materiais:0,   profissionais:2, ajudantes:0, almoco:1, translado:25},
+      {id:uid(), of_id:'OF-2025-001', data:'2025-09-15', fornecedor:'Bortolaso', materiais:355, profissionais:2, ajudantes:0, almoco:1, translado:25},
+      {id:uid(), of_id:'OF-2025-002', data:'2025-09-16', fornecedor:'Bortolaso', materiais:86,  profissionais:2, ajudantes:0, almoco:1, translado:25},
     ];
     persistLanc();
   }
