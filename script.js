@@ -1,6 +1,5 @@
-// Dashboard Adequações Civis v1.4.6
-// Fixes: translado capturado e refletido nas OFs; Orçado (OF) com máscara BRL correta;
-// datas da dashboard exibidas em dd/mm/yyyy (tabela e gráficos).
+// Dashboard Adequações Civis v1.4.6-live-mask
+// Igual à v1.4.6, mas com máscara BRL ao digitar (não some valor).
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -22,13 +21,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
   // Helpers num/BR date
-  const num = (v)=>{ if(v==null) return 0; const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.'); const n=parseFloat(s); return isNaN(n)?0:n; };
+  const num = (v)=>{
+    if(v==null) return 0;
+    const s=String(v)
+      .replace(/\uFEFF/g,'')
+      .replace(/R\$\s?/gi,'')
+      .replace(/\./g,'')        // milhar
+      .replace(/\s+/g,'')
+      .replace(',', '.');       // decimal
+    const n=parseFloat(s);
+    return isNaN(n)?0:n;
+  };
   const fmtBRDate = (iso)=> {
     if(!iso) return '';
-    // espera "yyyy-mm-dd"
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-    if(!m) return iso;
-    return `${m[3]}/${m[2]}/${m[1]}`;
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
   };
 
   const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
@@ -53,6 +60,50 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     persistSup();
   }
+
+  // =======================
+  // MÁSCARA BRL AO DIGITAR
+  // =======================
+  function moneyMaskBind(el){
+    if(!el || el.dataset.moneyBound) return;
+    el.dataset.moneyBound='1';
+    el.classList.add('money');
+    el.setAttribute('inputmode','decimal');
+    el.setAttribute('autocomplete','off');
+
+    // inicia sempre visível
+    if(!el.value || el.value === '0' || el.value === '0,00') el.value = BRL.format(0);
+
+    const digitsOnly = (v)=> (v||'').replace(/\D/g,'');      // só números
+    const fmt = (digits)=>{
+      if(!digits) return BRL.format(0);
+      const n = parseInt(digits,10);
+      return BRL.format(n/100);
+    };
+
+    // mantém BRL o tempo todo
+    el.addEventListener('input', () => {
+      const d = digitsOnly(el.value);
+      el.value = fmt(d);
+    });
+
+    el.addEventListener('focus', () => {
+      if(!el.value) el.value = BRL.format(0);
+      // seleciona tudo para facilitar edição no mobile
+      try { setTimeout(()=> el.setSelectionRange(0, el.value.length), 0); } catch(e){}
+    });
+
+    el.addEventListener('blur', () => {
+      const d = digitsOnly(el.value);
+      el.value = fmt(d); // nunca fica vazio
+    });
+  }
+
+  function bindMoneyFields(){
+    ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#translado','#transporte']
+      .forEach(sel=>{ const el=q(sel); if(el) moneyMaskBind(el); });
+  }
+  // =======================
 
   // Cálculos
   function fatorDia(tipo){ if(tipo==='sabado') return +cfg.mult_sab||1.5; if(tipo==='domingo') return +cfg.mult_dom||2.0; return 1; }
@@ -130,24 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const dl=q('#fornList'); if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
   }
 
-  // Máscara BRL (focus/blur estável)
-  function bindMoneyField(el){
-    if(!el || el.dataset.moneyBound) return; el.dataset.moneyBound='1';
-    const toPlain = ()=>{ const v=num(el.value); el.value = v ? String(v).replace('.',',') : ''; };
-    const toBRL   = ()=>{ const v=num(el.value); el.value = v ? BRL.format(v) : ''; };
-    const sanitize = ()=>{ let v=(el.value||'').replace(/[^\d,\.]/g,''); const lc=v.lastIndexOf(','); const ld=v.lastIndexOf('.'); const p=Math.max(lc,ld); if(p>=0){ const int=v.slice(0,p).replace(/[^\d]/g,''); const dec=v.slice(p+1).replace(/[^\d]/g,'').slice(0,2); v=int+(dec?','+dec:''); } else { v=v.replace(/[^\d]/g,''); } el.value=v; };
-    el.addEventListener('focus', toPlain);
-    el.addEventListener('input', sanitize);
-    el.addEventListener('blur', toBRL);
-    if(el.value) toBRL();
-  }
-  function bindMoneyFields(){
-    // inclui orçamento da OF, materiais, translado (ou transporte) e config
-    ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#translado','#transporte'].forEach(sel=>{
-      const el=q(sel); if(el) bindMoneyField(el);
-    });
-  }
-
   // OFs
   function renderOFs(){
     const wrap=q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
@@ -191,16 +224,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cadastro OF
   const formOF=q('#formOF');
   if(formOF){
-    bindMoneyFields(); // garante máscara no ofOrcado
+    bindMoneyFields(); // garante máscara
     formOF.addEventListener('submit',(e)=>{
       e.preventDefault();
       const id=(q('#ofNumero')?.value||'').trim(); if(!id) return alert('Informe o Nº/ID da OF.');
       if(ofs.some(o=>o.id===id)) return alert('Já existe uma OF com esse ID.');
       const cliente=(q('#ofCliente')?.value||'').trim();
-      const orcado=num(q('#ofOrcado')?.value||0); // BRL -> número
+      const orcado=num(q('#ofOrcado')?.value||0);
       const desc=(q('#ofDesc')?.value||'').trim();
       ofs.push({id,cliente,orcado,desc}); persistOFs();
-      formOF.reset(); renderOFs(); fillOFSelects();
+      formOF.reset(); bindMoneyFields(); renderOFs(); fillOFSelects();
       alert('OF cadastrada.');
     });
   }
@@ -218,13 +251,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const profissionais=parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
       const ajudantes=parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
       const almocoInput=num(q('#almoco')?.value||0);
-      // translado aceita #translado ou #transporte (compatibilidade)
       const transladoEl = q('#translado') || q('#transporte');
       const translado=num(transladoEl?.value||0);
       const tipo_dia=(q('#tipoDia')?.value)||'util';
 
       lanc.push({id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia});
-      ensureSupFromLanc(); persistAll(); form.reset();
+      ensureSupFromLanc(); persistAll(); form.reset(); bindMoneyFields();
       const td=q('#tipoDia'); if(td) td.value=tipo_dia;
       alert('Lançamento adicionado.'); renderAll();
     });
@@ -251,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
     addSelect();
 
-    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=BRL.format(+v||0); bindMoneyField(el); } };
+    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=BRL.format(+v||0); moneyMaskBind(el); } };
     setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
     const ms=q('#cfgMultSab'); if(ms) ms.value=cfg.mult_sab??1.5;
     const md=q('#cfgMultDom'); if(md) md.value=cfg.mult_dom??2.0;
@@ -324,12 +356,16 @@ document.addEventListener('DOMContentLoaded', () => {
       let txt=await file.text(); if(txt.charCodeAt(0)===0xFEFF) txt=txt.slice(1);
       const lines=txt.trim().split(/\r?\n/); if(!lines.length) return;
       const head=splitCsv(lines.shift()); const map=CSV_HEAD.map(h=> head.indexOf(h)); if(map.some(i=> i<0)){ alert('Cabeçalho CSV inválido. Esperado: '+CSV_HEAD.join(',')); return; }
-      const imported=[]; lines.forEach(line=>{ if(!line.trim()) return; const c=splitCsv(line); imported.push({
-        id:uid(), of_id:c[map[0]].trim(), data:c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
-        materiais:num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
-        ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco:num(c[map[6]]),
-        translado:num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
-      }); });
+      const imported=[];
+      lines.forEach(line=>{
+        if(!line.trim()) return; const c=splitCsv(line);
+        imported.push({
+          id:uid(), of_id:c[map[0]].trim(), data:c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
+          materiais:num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
+          ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco:num(c[map[6]]),
+          translado:num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
+        });
+      });
       lanc=imported; ensureSupFromLanc(); persistAll(); alert('Backup restaurado com sucesso!'); renderAll();
     }catch(err){ console.error('Import CSV:', err); alert('Não foi possível importar o CSV.'); }
   }
@@ -385,9 +421,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Gráficos (datas dd/mm/yyyy nos labels)
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
-    // agrupa por data (chave ISO) para manter ordenação depois formata
     const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
-    const dates = Object.keys(byDateRaw).sort(); // ISO ordena naturalmente
+    const dates = Object.keys(byDateRaw).sort();
     const labels = dates.map(d => d==='—' ? '—' : fmtBRDate(d));
     const series = dates.map(d => byDateRaw[d]);
 
@@ -438,7 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // Seeds (só pra não ficar vazio em ambiente novo)
+  // Seeds (para ambiente novo)
   if(ofs.length===0){
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
