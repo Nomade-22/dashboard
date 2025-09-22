@@ -24,8 +24,160 @@
 </header>
 
 <main>
-  <!-- aqui vão as abas (Dashboard, Lançamentos, OFs e Config) -->
-  <!-- igual ao que já te entreguei antes -->
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="tab active">
+    <div class="card header-filters">
+      <label class="small">OF selecionada
+        <select id="selOF"></select>
+      </label>
+      <label class="small">De:<input type="date" id="fDe"></label>
+      <label class="small">Até:<input type="date" id="fAte"></label>
+      <label class="small">Fornecedor:<input type="text" id="fFornecedor" placeholder="Filtrar fornecedor"></label>
+      <button class="btn" id="btnFiltrar">Aplicar filtros</button>
+      <button class="btn ghost" id="btnLimpar">Limpar</button>
+      <span class="pill" id="pillOrcado">Orçado: —</span>
+      <span class="pill" id="pillSaldo">Saldo: —</span>
+    </div>
+
+    <div class="kpis">
+      <div class="card kpi">
+        <div class="label">Total Materiais</div>
+        <div class="value" id="kpiMateriais">R$ 0,00</div>
+        <div class="sub" id="kpiItensMat">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Total Mão de Obra</div>
+        <div class="value" id="kpiMO">R$ 0,00</div>
+        <div class="sub" id="kpiHh">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Indiretos (Almoço + Translado)</div>
+        <div class="value" id="kpiIndiretos">R$ 0,00</div>
+        <div class="sub" id="kpiIndPct">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Total Geral</div>
+        <div class="value" id="kpiTotal">R$ 0,00</div>
+        <div class="sub" id="kpiRegistros">—</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="chart-wrap"><canvas id="graficoEvolucao"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="chart-wrap"><canvas id="graficoCategorias"></canvas></div>
+      </div>
+      <div class="card" style="grid-column:1 / -1">
+        <div class="chart-wrap"><canvas id="graficoFornecedores"></canvas></div>
+      </div>
+
+      <div class="card" style="grid-column:1 / -1">
+        <div class="toolbar">
+          <button class="btn" id="btnExportar">Exportar CSV</button>
+          <label class="btn ghost" for="inputCSV">Importar CSV</label>
+          <input id="inputCSV" type="file" accept=".csv" style="display:none">
+          <span class="muted">CSV: of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado</span>
+        </div>
+        <div class="table-wrap">
+          <table id="tabela">
+            <thead>
+              <tr>
+                <th>OF</th><th>Data</th><th>Fornecedor</th>
+                <th>Materiais</th><th>Profissionais</th><th>Ajudantes</th>
+                <th>Almoço</th><th>Translado</th><th>Total</th><th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- LANÇAMENTOS -->
+  <section id="lancamentos" class="tab">
+    <div class="two-col">
+      <div class="card">
+        <h3>Novo Lançamento</h3>
+        <form id="form" class="form">
+          <label class="small">OF
+            <select id="ofId" required></select>
+          </label>
+          <label class="small">Data<input type="date" id="data" required></label>
+          <label class="small">Fornecedor<input type="text" id="fornecedor" placeholder="Ex.: Bortolaso"></label>
+          <label class="small">Materiais (R$)<input type="number" id="materiais" step="0.01" min="0"></label>
+          <div class="row2">
+            <label class="small">Profissionais (qtd)<input type="number" id="profissionais" step="1" min="0"></label>
+            <label class="small">Ajudantes (qtd)<input type="number" id="ajudantes" step="1" min="0"></label>
+          </div>
+          <div class="row2">
+            <label class="small">Almoço (R$)<input type="number" id="almoco" step="0.01" min="0"></label>
+            <label class="small">Translado (R$)<input type="number" id="translado" step="0.01" min="0"></label>
+          </div>
+          <div class="btns">
+            <button class="btn primary" type="submit">Adicionar</button>
+            <button class="btn ghost" type="reset">Limpar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3>Ajuda</h3>
+        <ul class="muted">
+          <li>Cadastre as <b>OFs</b> primeiro (aba OFs). Cada OF é um <b>centro de custo</b>.</li>
+          <li>Selecione a OF na hora de lançar uma despesa.</li>
+          <li>Dashboard mostra o <b>saldo</b> da OF selecionada.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- OFs -->
+  <section id="ofs" class="tab">
+    <div class="two-col">
+      <div class="card">
+        <h3>Cadastrar OF</h3>
+        <form id="formOF" class="form">
+          <label class="small">Nº/ID da OF<input type="text" id="ofNumero" required></label>
+          <label class="small">Cliente<input type="text" id="ofCliente"></label>
+          <label class="small">Orçamento (R$)<input type="number" id="ofOrcado" step="0.01" min="0"></label>
+          <label class="small">Descrição<textarea id="ofDesc"></textarea></label>
+          <div class="btns">
+            <button class="btn primary" type="submit">Salvar OF</button>
+            <button class="btn" id="btnResetOFs" type="button">Apagar todas OFs</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3>OFs cadastradas</h3>
+        <div class="of-grid" id="ofCards"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONFIG -->
+  <section id="config" class="tab">
+    <div class="card" style="max-width:520px">
+      <h3>Configurações</h3>
+      <div class="form">
+        <label class="small">R$/dia Profissional
+          <input type="number" id="cfgProf" step="0.01" min="0">
+        </label>
+        <label class="small">R$/dia Ajudante
+          <input type="number" id="cfgAjud" step="0.01" min="0">
+        </label>
+        <div class="btns">
+          <button class="btn primary" id="btnSalvarCfg">Salvar</button>
+          <button class="btn" id="btnResetar">Resetar dados (lançamentos)</button>
+        </div>
+        <p class="muted">Padrão: Prof R$ 809,00 | Ajud R$ 405,00</p>
+      </div>
+    </div>
+  </section>
 </main>
 
 <script src="script.js"></script>
