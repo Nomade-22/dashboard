@@ -14,7 +14,7 @@ header{position:sticky; top:0; z-index:50; backdrop-filter:saturate(140%) blur(6
   border-bottom:1px solid var(--border); padding:16px 20px; display:flex; align-items:center; justify-content:space-between;}
 .title{display:flex; gap:12px; align-items:center;}
 .title h1{font-size:18px; margin:0; letter-spacing:.2px}
-.tabs{display:flex; gap:8px}
+.tabs{display:flex; gap:8px; flex-wrap:wrap}
 .btn{background:var(--panel-2); color:var(--text); border:1px solid var(--border);
   padding:12px 16px; border-radius:12px; cursor:pointer; font-weight:600; transition:.2s ease; min-height:40px}
 .btn:hover{border-color:var(--primary); box-shadow:var(--ring)}
@@ -70,12 +70,15 @@ tr:hover td{background:#121724}
 
 /* Colunas */
 .two-col{display:grid; grid-template-columns:minmax(320px,440px) 1fr; gap:14px}
-
-/* Form lançamentos (mais limpo no mobile) */
 .form{display:grid; gap:10px}
 .form .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
 .form .btns{display:flex; gap:8px; margin-top:6px}
 .form input, .form select, .form textarea{width:100%}
+
+/* Fornecedores */
+.sup-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px}
+.sup-item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--panel-2)}
+.sup-item b{font-weight:700}
 
 /* Responsivo */
 @media (max-width:980px){
@@ -85,9 +88,16 @@ tr:hover td{background:#121724}
   canvas{height:240px !important}
   .btn{width:100%}
 }
-
 @media (max-width:600px){
   .kpis{grid-template-columns:1fr}
   .header-filters label.small{min-width:140px}
   .title h1{font-size:16px}
+}
+
+/* Impressão (PDF) */
+@media print{
+  header, .toolbar, .tabs, .dropzone, .btn, .pill, .of-progress { display:none !important; }
+  body{background:#fff; color:#000}
+  .card{box-shadow:none; border:1px solid #ddd}
+  table{min-width:0; font-size:12px}
 }
