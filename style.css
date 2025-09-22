@@ -53,6 +53,7 @@ input, select, textarea{
 }
 textarea{min-height:84px; resize:vertical}
 input:focus, select:focus, textarea:focus{border-color:var(--primary); box-shadow:var(--ring)}
+input.money{text-align:right; font-variant-numeric:tabular-nums}
 
 /* Tabela */
 .table-wrap{width:100%; overflow-x:auto}
