@@ -1,11 +1,14 @@
-// Dashboard Adequações Civis v1.4.6
-// Fixes: translado capturado e refletido nas OFs; Orçado (OF) com máscara BRL correta;
-// datas da dashboard exibidas em dd/mm/yyyy (tabela e gráficos).
+// Adequações Civis v1.4.7
+// 1) Máscara BRL ao digitar (estável, não some), aplicada a todos os campos monetários.
+// 2) Dashboard responsivo (gráficos menores em mobile).
+// 3) Fornecedor puxa do cadastro (datalist + normalização consistente).
+// 4) Materiais e Translado lidos de ids alternativos (#materiais|#material e #translado|#transporte).
+// Mantém: CSV simétrico, PDF (print), múltiplos OFs, extras fds, datas dd/mm/yyyy.
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const KEY = 'adq_civis_lancamentos_v14';
-  const CFG_KEY = 'adq_civis_cfg_v14_6';
+  const CFG_KEY = 'adq_civis_cfg_v147';
   const OF_KEY = 'adq_civis_ofs_v11';
   const SUP_KEY = 'adq_civis_suppliers_v14';
 
@@ -21,40 +24,103 @@ document.addEventListener('DOMContentLoaded', () => {
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
-  // Helpers num/BR date
-  const num = (v)=>{ if(v==null) return 0; const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.'); const n=parseFloat(s); return isNaN(n)?0:n; };
+  // --- Helpers ---
+  const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const num = (v)=> {
+    if (v==null) return 0;
+    // aceita "R$ 125.250,00", "125250", "1.234,5"
+    const s = String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
   const fmtBRDate = (iso)=> {
     if(!iso) return '';
-    // espera "yyyy-mm-dd"
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-    if(!m) return iso;
-    return `${m[3]}/${m[2]}/${m[1]}`;
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
   };
 
-  const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  function persistAll(){ localStorage.setItem(KEY, JSON.stringify(lanc)); localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); localStorage.setItem(OF_KEY, JSON.stringify(ofs)); localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
+  const persistLanc = ()=> localStorage.setItem(KEY, JSON.stringify(lanc));
+  const persistCfg  = ()=> localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+  const persistOFs  = ()=> localStorage.setItem(OF_KEY, JSON.stringify(ofs));
+  const persistSup  = ()=> localStorage.setItem(SUP_KEY, JSON.stringify(sups));
+
+  // --- Fornecedores (canonical + datalist) ---
   function canonicalSupplierName(input){
-    const clean = normalize(input); if(!clean) return '';
-    for(const s of sups){ if(normalize(s.name)===clean) return s.name; if((s.aliases||[]).some(a=> normalize(a)===clean)) return s.name; }
+    const clean = normalize(input);
+    if(!clean) return '';
+    for(const s of sups){
+      if(normalize(s.name)===clean) return s.name;
+      if((s.aliases||[]).some(a=> normalize(a)===clean)) return s.name;
+    }
     return (input||'').trim();
   }
-
-  function persistAll(){ localStorage.setItem(KEY, JSON.stringify(lanc)); localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); localStorage.setItem(OF_KEY, JSON.stringify(ofs)); localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
-  function persistLanc(){ localStorage.setItem(KEY, JSON.stringify(lanc)); }
-  function persistCfg(){ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
-  function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
-  function persistSup(){ localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
-
   function ensureSupFromLanc(){
-    const names = [...new Set(lanc.map(l=> (l.fornecedor||'').trim()).filter(Boolean))];
-    names.forEach(n=>{
+    const candidates = [...new Set(lanc.map(l=> (l.fornecedor||'').trim()).filter(Boolean))];
+    candidates.forEach(n=>{
       if(!sups.some(s=> normalize(s.name)===normalize(n))){
         sups.push({id: uid(), name: n, aliases: []});
       }
     });
     persistSup();
   }
+  function refreshFornecedorDatalist(){
+    if(!q('#fornList')){
+      const dl = document.createElement('datalist'); dl.id='fornList';
+      document.body.appendChild(dl);
+    }
+    const dl = q('#fornList');
+    if(dl){ dl.innerHTML = sups.map(s=> `<option value="${s.name}">`).join(''); }
+    const inp = q('#fornecedor');
+    if(inp){ inp.setAttribute('list','fornList'); }
+  }
 
-  // Cálculos
+  // --- BRL Mask (ao digitar) ---
+  // Estratégia: mantém sempre "R$ x", digitando apenas números; converte para centavos e formata.
+  function moneyMaskBind(el){
+    if(!el || el.dataset.moneyBind) return;
+    el.dataset.moneyBind = '1';
+    el.classList.add('money');
+    el.setAttribute('inputmode','decimal');
+    el.setAttribute('autocomplete','off');
+
+    // inicia mostrando R$ 0,00 para campos vazios
+    if(!el.value) el.value = BRL.format(0);
+
+    const formatFromDigits = (digits) => {
+      // digits: string só com 0-9
+      if(!digits) return BRL.format(0);
+      const n = parseInt(digits,10);
+      return BRL.format(n/100);
+    };
+
+    const getDigits = (val) => (val||'').replace(/\D/g,''); // só números
+
+    el.addEventListener('focus', () => {
+      // mantém o formato BRL no foco; não esconde o "R$"
+      // (para facilitar em mobile e evitar "sumir" o valor)
+      if(!el.value) el.value = BRL.format(0);
+      // seleciona tudo ao focar para facilitar digitação
+      setTimeout(()=> el.setSelectionRange(0, el.value.length), 0);
+    });
+
+    el.addEventListener('input', () => {
+      const digits = getDigits(el.value);
+      el.value = formatFromDigits(digits);
+    });
+
+    el.addEventListener('blur', () => {
+      const digits = getDigits(el.value);
+      el.value = formatFromDigits(digits); // garante que nunca fica vazio
+    });
+  }
+  function bindAllMoney(){
+    const sels = ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco',
+                  '#materiais','#material','#translado','#transporte'];
+    sels.forEach(sel => { const el = q(sel); if(el) moneyMaskBind(el); });
+  }
+
+  // --- Cálculos ---
   function fatorDia(tipo){ if(tipo==='sabado') return +cfg.mult_sab||1.5; if(tipo==='domingo') return +cfg.mult_dom||2.0; return 1; }
   function almocoTotalDe(l){
     const ppl=(+l.profissionais||0)+(+l.ajudantes||0);
@@ -70,49 +136,19 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0)+mo+almocoTotalDe(l)+(+l.translado||0);
   }
 
-  // Tabs
+  // --- Abas ---
   document.addEventListener('click', (ev)=>{
     const b = ev.target.closest('button[data-tab]'); if(!b) return;
     ev.preventDefault(); qa('.tab').forEach(t=>t.classList.remove('active'));
     const id=b.dataset.tab, tgt=q('#'+id); if(tgt) tgt.classList.add('active');
+
     if(id==='dashboard') renderAll();
-    if(id==='lancamentos'){ ensureTipoDiaField(); ensureFornecedorDatalist(); fillOFSelects(); bindMoneyFields(); }
-    if(id==='ofs'){ renderOFs(); fillOFSelects(); ensureResetBtn(); bindMoneyFields(); }
-    if(id==='config'){ ensureConfigUI(true); bindMoneyFields(); }
+    if(id==='lancamentos'){ ensureTipoDiaField(); ensureFornecedor(); fillOFSelects(); bindAllMoney(); }
+    if(id==='ofs'){ renderOFs(); fillOFSelects(); ensureResetBtn(); bindAllMoney(); }
+    if(id==='config'){ ensureConfigUI(true); bindAllMoney(); }
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
-  // Injeta tab Fornecedores se faltar
-  (function injectSuppliersTab(){
-    if(!q('button[data-tab="fornecedores"]')){
-      const tabs=q('.tabs'); if(tabs){ const btn=document.createElement('button'); btn.className='btn'; btn.dataset.tab='fornecedores'; btn.textContent='Fornecedores'; tabs.appendChild(btn); }
-    }
-    if(!q('#fornecedores')){
-      const m=document.createElement('section'); m.id='fornecedores'; m.className='tab card';
-      m.innerHTML=`
-        <h2>Cadastro de Fornecedores</h2>
-        <div class="form" style="margin-top:10px">
-          <div class="row2">
-            <label class="small">Nome do fornecedor
-              <input id="supNome" placeholder="Ex.: Bortolaso" />
-            </label>
-            <label class="small">Apelidos (separados por vírgula)
-              <input id="supAliases" placeholder="Ex.: Borto, Bortolaso Ltda" />
-            </label>
-          </div>
-          <div class="btns">
-            <button class="btn primary" id="btnAddSup" type="button">Adicionar</button>
-            <button class="btn" id="btnUnificar" type="button">Unificar lançamentos</button>
-          </div>
-        </div>
-        <div style="margin-top:12px"><div id="supList" class="sup-grid"></div></div>
-        <p class="muted" style="margin-top:10px">“Unificar lançamentos” substitui variações pelo nome cadastrado.</p>
-      `;
-      q('main')?.appendChild(m);
-    }
-  })();
-
-  // Lançamentos UI
   function ensureTipoDiaField(){
     if(q('#tipoDia')) return;
     const container=q('#form')?.querySelector('.row2')||q('#form'); if(!container) return;
@@ -125,30 +161,13 @@ document.addEventListener('DOMContentLoaded', () => {
       </select>`;
     container.appendChild(label);
   }
-  function ensureFornecedorDatalist(){
-    if(!q('#fornList')){ const dl=document.createElement('datalist'); dl.id='fornList'; document.body.appendChild(dl); const inp=q('#fornecedor'); if(inp) inp.setAttribute('list','fornList'); }
-    const dl=q('#fornList'); if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
+  function ensureFornecedor(){
+    refreshFornecedorDatalist();
+    const inp = q('#fornecedor');
+    if(inp && !inp.placeholder) inp.placeholder = 'Selecione ou digite';
   }
 
-  // Máscara BRL (focus/blur estável)
-  function bindMoneyField(el){
-    if(!el || el.dataset.moneyBound) return; el.dataset.moneyBound='1';
-    const toPlain = ()=>{ const v=num(el.value); el.value = v ? String(v).replace('.',',') : ''; };
-    const toBRL   = ()=>{ const v=num(el.value); el.value = v ? BRL.format(v) : ''; };
-    const sanitize = ()=>{ let v=(el.value||'').replace(/[^\d,\.]/g,''); const lc=v.lastIndexOf(','); const ld=v.lastIndexOf('.'); const p=Math.max(lc,ld); if(p>=0){ const int=v.slice(0,p).replace(/[^\d]/g,''); const dec=v.slice(p+1).replace(/[^\d]/g,'').slice(0,2); v=int+(dec?','+dec:''); } else { v=v.replace(/[^\d]/g,''); } el.value=v; };
-    el.addEventListener('focus', toPlain);
-    el.addEventListener('input', sanitize);
-    el.addEventListener('blur', toBRL);
-    if(el.value) toBRL();
-  }
-  function bindMoneyFields(){
-    // inclui orçamento da OF, materiais, translado (ou transporte) e config
-    ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#translado','#transporte'].forEach(sel=>{
-      const el=q(sel); if(el) bindMoneyField(el);
-    });
-  }
-
-  // OFs
+  // --- OFs ---
   function renderOFs(){
     const wrap=q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapG={}; lanc.forEach(l=>{ mapG[l.of_id]=(mapG[l.of_id]||0)+gastoLanc(l); });
@@ -169,7 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="of-progress"><div class="of-bar" style="width:${pct}%;"></div></div>`;
       wrap.appendChild(card);
     });
-    ensureResetBtn();
   }
   function ensureResetBtn(){
     if(!q('#btnResetOFs')){
@@ -191,16 +209,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cadastro OF
   const formOF=q('#formOF');
   if(formOF){
-    bindMoneyFields(); // garante máscara no ofOrcado
+    bindAllMoney();
     formOF.addEventListener('submit',(e)=>{
       e.preventDefault();
       const id=(q('#ofNumero')?.value||'').trim(); if(!id) return alert('Informe o Nº/ID da OF.');
       if(ofs.some(o=>o.id===id)) return alert('Já existe uma OF com esse ID.');
       const cliente=(q('#ofCliente')?.value||'').trim();
-      const orcado=num(q('#ofOrcado')?.value||0); // BRL -> número
+      const orcado=num(q('#ofOrcado')?.value||0); // parse BRL (não some)
       const desc=(q('#ofDesc')?.value||'').trim();
       ofs.push({id,cliente,orcado,desc}); persistOFs();
-      formOF.reset(); renderOFs(); fillOFSelects();
+      formOF.reset(); bindAllMoney(); renderOFs(); fillOFSelects();
       alert('OF cadastrada.');
     });
   }
@@ -208,25 +226,34 @@ document.addEventListener('DOMContentLoaded', () => {
   // Lançamentos
   const form=q('#form');
   if(form){
-    bindMoneyFields();
+    bindAllMoney();
     form.addEventListener('submit',(e)=>{
       e.preventDefault();
       const of_id=q('#ofId')?.value; if(!of_id) return alert('Selecione uma OF.');
       const data=q('#data')?.value||'';
-      const fornecedor=canonicalSupplierName((q('#fornecedor')?.value||'').trim());
-      const materiais=num(q('#materiais')?.value||0);
+      // fornecedor: se existir no cadastro, usa forma canônica; senão mantém texto digitado
+      const fornecRaw=(q('#fornecedor')?.value||'').trim();
+      const fornecCanon=canonicalSupplierName(fornecRaw)||fornecRaw;
+
+      // Materiais: aceita #materiais ou #material
+      const matEl = q('#materiais') || q('#material');
+      const materiais = num(matEl?.value||0);
+
+      // Translado: aceita #translado ou #transporte
+      const transEl = q('#translado') || q('#transporte');
+      const translado = num(transEl?.value||0);
+
       const profissionais=parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
       const ajudantes=parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
       const almocoInput=num(q('#almoco')?.value||0);
-      // translado aceita #translado ou #transporte (compatibilidade)
-      const transladoEl = q('#translado') || q('#transporte');
-      const translado=num(transladoEl?.value||0);
       const tipo_dia=(q('#tipoDia')?.value)||'util';
 
-      lanc.push({id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia});
+      lanc.push({id:uid(), of_id, data, fornecedor:fornecCanon, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia});
       ensureSupFromLanc(); persistAll(); form.reset();
       const td=q('#tipoDia'); if(td) td.value=tipo_dia;
-      alert('Lançamento adicionado.'); renderAll();
+      bindAllMoney();
+      alert('Lançamento adicionado.');
+      renderAll();
     });
   }
 
@@ -251,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
     addSelect();
 
-    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=BRL.format(+v||0); bindMoneyField(el); } };
+    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=BRL.format(+v||0); moneyMaskBind(el); } };
     setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
     const ms=q('#cfgMultSab'); if(ms) ms.value=cfg.mult_sab??1.5;
     const md=q('#cfgMultDom'); if(md) md.value=cfg.mult_dom??2.0;
@@ -265,9 +292,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!q('#btnExportPDF')){ const tb=q('.toolbar'); if(tb){ const b=document.createElement('button'); b.id='btnExportPDF'; b.className='btn'; b.textContent='Exportar PDF'; b.onclick=()=>window.print(); tb.appendChild(b); } }
   }
 
-  // Fornecedores
+  // Fornecedores UI
   function renderSupUI(){
     ensureSupFromLanc();
+    refreshFornecedorDatalist();
     const list=q('#supList'); if(!list) return; list.innerHTML='';
     sups.forEach(s=>{
       const div=document.createElement('div'); div.className='sup-item';
@@ -277,15 +305,15 @@ document.addEventListener('DOMContentLoaded', () => {
       list.appendChild(div);
     });
     const btnAdd=q('#btnAddSup'), iNome=q('#supNome'), iAliases=q('#supAliases');
-    if(btnAdd) btnAdd.onclick=()=>{ const name=(iNome?.value||'').trim(); if(!name) return alert('Informe o nome do fornecedor.'); const al=(iAliases?.value||'').split(',').map(s=>s.trim()).filter(Boolean); if(sups.some(x=> normalize(x.name)===normalize(name))) return alert('Fornecedor já cadastrado.'); sups.push({id:uid(), name, aliases:al}); persistSup(); iNome.value=''; iAliases.value=''; renderSupUI(); ensureFornecedorDatalist(); };
+    if(btnAdd) btnAdd.onclick=()=>{ const name=(iNome?.value||'').trim(); if(!name) return alert('Informe o nome do fornecedor.'); const al=(iAliases?.value||'').split(',').map(s=>s.trim()).filter(Boolean); if(sups.some(x=> normalize(x.name)===normalize(name))) return alert('Fornecedor já cadastrado.'); sups.push({id:uid(), name, aliases:al}); persistSup(); iNome.value=''; iAliases.value=''; renderSupUI(); };
     list.querySelectorAll('[data-delsup]').forEach(b=>{
       b.onclick=()=>{ const id=b.dataset.delsup; const s=sups.find(x=>x.id===id); sups=sups.filter(x=>x.id!==id); persistSup();
         if(s){ const all=[s.name,...(s.aliases||[])].map(x=>normalize(x)); lanc.forEach(l=>{ if(all.includes(normalize(l.fornecedor||''))) l.fornecedor=''; }); persistLanc(); }
-        renderSupUI(); ensureFornecedorDatalist(); renderAll();
+        renderSupUI(); renderAll();
       };
     });
     list.querySelectorAll('[data-editsup]').forEach(b=>{
-      b.onclick=()=>{ const s=sups.find(x=>x.id===b.dataset.editsup); if(!s) return; q('#supNome').value=s.name; q('#supAliases').value=(s.aliases||[]).join(', '); sups=sups.filter(x=>x.id!==s.id); persistSup(); renderSupUI(); ensureFornecedorDatalist(); };
+      b.onclick=()=>{ const s=sups.find(x=>x.id===b.dataset.editsup); if(!s) return; q('#supNome').value=s.name; q('#supAliases').value=(s.aliases||[]).join(', '); sups=sups.filter(x=>x.id!==s.id); persistSup(); renderSupUI(); };
     });
     const btnUni=q('#btnUnificar');
     if(btnUni) btnUni.onclick=()=>{ lanc.forEach(l=>{ l.fornecedor=canonicalSupplierName(l.fornecedor||''); }); persistLanc(); alert('Lançamentos unificados pelos fornecedores cadastrados.'); renderAll(); renderSupUI(); };
@@ -341,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   }
 
-  // Tabela (datas em dd/mm/yyyy)
+  // Tabela
   function renderTable(rows){
     const tb=q('#tabela tbody'); if(!tb) return; tb.innerHTML='';
     rows.forEach(l=>{
@@ -377,12 +405,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Gráficos (datas dd/mm/yyyy nos labels)
+  // Gráficos (responsivos)
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
-    // agrupa por data (chave ISO) para manter ordenação depois formata
     const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
-    const dates = Object.keys(byDateRaw).sort(); // ISO ordena naturalmente
+    const dates = Object.keys(byDateRaw).sort();
     const labels = dates.map(d => d==='—' ? '—' : fmtBRDate(d));
     const series = dates.map(d => byDateRaw[d]);
 
@@ -401,39 +428,43 @@ document.addEventListener('DOMContentLoaded', () => {
       if(vm>0&&forn){ byForn[forn]=(byForn[forn]||0)+vm; }
     });
 
+    // ratio diferente no mobile para ficar mais estreito
+    const isMobile = window.matchMedia('(max-width: 640px)').matches;
+    const aspect = isMobile ? 1.6 : 2.2;
+
     [chEvo,chCat,chForn].forEach(ch=> ch && ch.destroy());
     const e1=q('#graficoEvolucao'); if(e1){
       chEvo = new Chart(e1.getContext('2d'), { type:'line',
         data:{ labels, datasets:[{ label:'Total por dia', data:series, tension:.25 }]},
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
+        options:{ responsive:true, maintainAspectRatio:true, aspectRatio:aspect, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
       });
     }
     const e2=q('#graficoCategorias'); if(e2){
       chCat = new Chart(e2.getContext('2d'), { type:'doughnut',
         data:{ labels:Object.keys(cat), datasets:[{ data:Object.values(cat) }]},
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
+        options:{ responsive:true, maintainAspectRatio:true, aspectRatio:isMobile?1:1.4, plugins:{ legend:{ position:isMobile?'bottom':'bottom' } } }
       });
     }
     const e3=q('#graficoFornecedores'); if(e3){
       chForn = new Chart(e3.getContext('2d'), { type:'bar',
         data:{ labels:Object.keys(byForn), datasets:[{ label:'Materiais por fornecedor', data:Object.values(byForn) }]},
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
+        options:{ responsive:true, maintainAspectRatio:true, aspectRatio:aspect, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } }, x:{ ticks:{ maxRotation: isMobile?70:0, minRotation:isMobile?45:0 } } } }
       });
     }
   }
 
   function renderAll(){
     ensureSupFromLanc();
-    ensureFornecedorDatalist();
+    refreshFornecedorDatalist();
     fillOFSelects();
-    bindMoneyFields();
+    bindAllMoney();
     const rows=filtrarDados();
     renderKpis(rows);
     renderCharts(rows);
     renderTable(rows);
   }
 
-  // Seeds (só pra não ficar vazio em ambiente novo)
+  // Seeds (opcional)
   if(ofs.length===0){
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
