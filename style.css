@@ -1,43 +1,70 @@
+/* Adequações Civis — style.css (baseline v1.4.6) */
+/* Tema escuro discreto + grid fluido, sem “apertar” demais no mobile */
+
 :root{
   --bg:#0f1115; --panel:#151922; --panel-2:#1b2130; --muted:#9aa4b2; --text:#e7ecf3;
   --primary:#4f8cff; --primary-2:#6aa1ff; --ok:#00c853; --warn:#ffb300; --danger:#ff5252;
   --border:#242b3a; --radius:16px;
 }
+
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text);}
+body{
+  margin:0;
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
 
-/* Header */
-header{position:sticky; top:0; z-index:50; backdrop-filter:saturate(140%) blur(6px);
+/* Header / Tabs */
+header{
+  position:sticky; top:0; z-index:50;
   background:linear-gradient(180deg, rgba(21,25,34,.9), rgba(21,25,34,.75));
-  border-bottom:1px solid var(--border); padding:16px 20px; display:flex; align-items:center; justify-content:space-between;}
-.title{display:flex; gap:12px; align-items:center;}
+  backdrop-filter:saturate(140%) blur(6px);
+  border-bottom:1px solid var(--border);
+  padding:16px 20px; display:flex; align-items:center; justify-content:space-between;
+}
+.title{display:flex; gap:12px; align-items:center}
 .title h1{font-size:18px; margin:0; letter-spacing:.2px}
 .tabs{display:flex; gap:8px; flex-wrap:wrap}
-.btn{background:var(--panel-2); color:var(--text); border:1px solid var(--border);
-  padding:12px 16px; border-radius:12px; cursor:pointer; font-weight:600; transition:.2s ease; min-height:40px}
+.btn{
+  background:var(--panel-2); color:var(--text); border:1px solid var(--border);
+  padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600; transition:.2s ease; min-height:38px
+}
 .btn:hover{border-color:var(--primary); box-shadow:0 0 0 2px rgba(79,140,255,.25)}
 .btn.primary{background:var(--primary); border-color:transparent; color:#0a0f1a}
 .btn.ghost{background:transparent}
 
 /* Main + cards */
-main{max-width:1220px; margin:24px auto; padding:0 16px}
-.tab{display:none} .tab.active{display:block; animation:fade .2s ease}
+main{max-width:1200px; margin:24px auto; padding:0 16px}
+.tab{display:none}
+.tab.active{display:block; animation:fade .15s ease}
 @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
-.card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);}
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+}
 .muted{color:var(--muted)}
-.pill{display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:var(--panel-2)}
+.pill{
+  display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px;
+  border:1px solid var(--border); background:var(--panel-2)
+}
 
 /* Dashboard */
 .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
 .kpi .label{color:var(--muted); font-size:12px; letter-spacing:.4px; text-transform:uppercase}
 .kpi .value{font-size:26px; font-weight:700; margin-top:6px}
 .kpi .sub{margin-top:6px; font-size:12px; color:var(--muted)}
+
 .grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px}
 .chart-wrap{min-height:320px; padding:8px 8px 4px}
 canvas{width:100% !important; height:280px !important}
 
-/* Inputs */
+/* Formulários */
 label.small{display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--muted)}
 input, select, textarea{
   background:var(--panel-2); color:var(--text); border:1px solid var(--border);
@@ -47,6 +74,13 @@ input, select, textarea{
 textarea{min-height:84px; resize:vertical}
 input:focus, select:focus, textarea:focus{border-color:var(--primary); box-shadow:0 0 0 2px rgba(79,140,255,.25)}
 input.money{text-align:right; font-variant-numeric:tabular-nums}
+
+/* Layout de formulário */
+.two-col{display:grid; grid-template-columns:minmax(320px,440px) 1fr; gap:14px}
+.form{display:grid; gap:10px}
+.form .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.form .btns{display:flex; gap:8px; margin-top:6px}
+.form input, .form select, .form textarea{width:100%}
 
 /* Tabela */
 .table-wrap{width:100%; overflow-x:auto}
@@ -62,37 +96,26 @@ tr:hover td{background:#121724}
 .tag-warn{background:rgba(255,179,0,.1); color:#ffdd7a; border-color:rgba(255,179,0,.3)}
 .tag-danger{background:rgba(255,82,82,.1); color:#ffb4b4; border-color:rgba(255,82,82,.3)}
 
-/* Form grid */
-.two-col{display:grid; grid-template-columns:minmax(320px,440px) 1fr; gap:14px}
-.form{display:grid; gap:10px}
-.form .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
-.form .btns{display:flex; gap:8px; margin-top:6px}
-.form input, .form select, .form textarea{width:100%}
-
 /* Fornecedores */
 .sup-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px}
 .sup-item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--panel-2)}
 .sup-item b{font-weight:700}
 
-/* Responsivo */
+/* Responsivo (igual ao que você tinha antes) */
 @media (max-width:980px){
   .kpis{grid-template-columns:1fr 1fr}
   .grid{grid-template-columns:1fr}
   .two-col{grid-template-columns:1fr}
-  canvas{height:240px !important}
-  .chart-wrap{min-height:240px}
+  canvas{height:260px !important}
+  .chart-wrap{min-height:260px}
 }
 @media (max-width:640px){
   .kpis{grid-template-columns:1fr}
   .title h1{font-size:16px}
   .btn{width:100%}
-  canvas{height:200px !important}
-  .chart-wrap{min-height:200px}
+  canvas{height:220px !important}
+  .chart-wrap{min-height:220px}
   .card{padding:12px}
-}
-@media (max-width:420px){
-  canvas{height:170px !important}
-  .chart-wrap{min-height:170px}
 }
 
 /* Impressão (PDF) */
