@@ -164,4 +164,43 @@ function renderTable(rows){
       <td>${escapeHtml(l.fornecedor||'')}</td>
       <td>${BRL.format(l.materiais||0)}</td>
       <td>${l.profissionais||0}</td>
-      <td>${l.ajudantes||0}<
+      <td>${l.ajudantes||0}</td>
+      <td>${BRL.format(l.almoco||0)}</td>
+      <td>${BRL.format(l.translado||0)}</td>
+      <td><b>${BRL.format(total)}</b></td>
+      <td><button class="btn ghost" data-del="${idx}">Excluir</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick = ()=>{ const i = +b.dataset.del; if(confirm('Remover este lançamento?')){ lanc.splice(i,1); persistLanc(); renderAll(); } }
+  });
+}
+
+function renderKpis(rows){
+  const mat = sum(rows, r=> +r.materiais||0);
+  const mo  = sum(rows, r=> r.profissionais*cfg.prof + r.ajudantes*cfg.ajud );
+  const ind = sum(rows, r=> +r.almoco + +r.translado);
+  const total = mat + mo + ind;
+  q('#kpiMateriais').textContent = BRL.format(mat);
+  q('#kpiMO').textContent = BRL.format(mo);
+  q('#kpiIndiretos').textContent = BRL.format(ind);
+  q('#kpiTotal').textContent = BRL.format(total);
+  q('#kpiRegistros').textContent = rows.length ? `${rows.length} registros` : 'Sem registros';
+  q('#kpiHh').textContent = `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`;
+  q('#kpiIndPct').textContent = `Indiretos ${total?(ind/total*100).toFixed(1):0}%`;
+}
+
+let chEvo=null,chCat=null,chForn=null;
+function renderCharts(rows){
+  const byDate = {}; rows.forEach(r=>{ byDate[r.data]=(byDate[r.data]||0)+gastoLanc(r) });
+  const cat = {
+    'Materiais': sum(rows,r=>+r.materiais||0),
+    'Mão de Obra': sum(rows,r=>r.profissionais*cfg.prof+r.ajudantes*cfg.ajud),
+    'Indiretos': sum(rows,r=>+r.almoco+ +r.translado)
+  };
+  const byForn={}; rows.forEach(r=>{ byForn[r.fornecedor]=(byForn[r.fornecedor]||0)+gastoLanc(r) });
+
+  [chEvo,chCat,chForn].forEach(c=>c&&c.destroy());
+
+  chEvo=new Chart(q('#graficoEvolucao'),{type:'line',data:{labels:Object.keys(byDate),datasets:[{data:Object.values(byDate)}]}});
+  chCat=new Chart(q('#graficoCategorias'),{type:'doughnut',data:{labels:Object.keys(cat),datasets
