@@ -4,12 +4,14 @@
   --border:#242b3a; --ring: 0 0 0 2px rgba(79,140,255,.25);
   --radius:16px;
 }
-*{box-sizing:border-box}
 body{margin:0; font-family:Inter,sans-serif; background:var(--bg); color:var(--text);}
 header{position:sticky; top:0; background:var(--panel-2); padding:16px; display:flex; justify-content:space-between}
 .btn{padding:10px 14px; border-radius:10px; border:1px solid var(--border); background:var(--panel-2); color:var(--text)}
 .btn.primary{background:var(--primary); color:#0a0f1a}
-.tab{display:none}
-.tab.active{display:block}
-.card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px}
+.tab{display:none}.tab.active{display:block}
+.card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-top:10px}
 .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.btns{display:flex; gap:8px; margin-top:6px}
+.of-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px}
+.pill{display:inline-block; padding:4px 8px; border-radius:999px; background:var(--panel-2); font-size:12px}
