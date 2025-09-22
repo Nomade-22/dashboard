@@ -1,12 +1,13 @@
-// Dashboard Adequações Civis v1.1 (OF) — robusto com DOMContentLoaded
+// Dashboard Adequações Civis v1.2.1 — ajustes: fornecedor só Materiais, almoço por pessoa, layout
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const KEY = 'adq_civis_lancamentos_v11';
-  const CFG_KEY = 'adq_civis_cfg_v11';
+  const CFG_KEY = 'adq_civis_cfg_v12';   // nova versão inclui cfg.almoco
   const OF_KEY = 'adq_civis_ofs_v11';
 
+  // config com almoço por pessoa (default 35)
+  let cfg  = JSON.parse(localStorage.getItem(CFG_KEY) || '{"prof":809,"ajud":405,"almoco":35}');
   let lanc = JSON.parse(localStorage.getItem(KEY) || '[]');
-  let cfg  = JSON.parse(localStorage.getItem(CFG_KEY) || '{"prof":809,"ajud":405}');
   let ofs  = JSON.parse(localStorage.getItem(OF_KEY)  || '[]');
 
   const q  = (s)=>document.querySelector(s);
@@ -18,33 +19,35 @@ document.addEventListener('DOMContentLoaded', () => {
   function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
 
   function findOF(id){ return ofs.find(o => o.id===id); }
-  function gastoLanc(l){ return (+l.materiais||0) + (l.profissionais*cfg.prof) + (l.ajudantes*cfg.ajud) + (+l.almoco||0) + (+l.translado||0); }
+  // >>> almoço: campo #almoco agora é QUANTIDADE de dias; custo = qtd * (prof+ajud) * cfg.almoco
+  function gastoLanc(l){
+    const mat = +l.materiais||0;
+    const mo  = (l.profissionais*cfg.prof) + (l.ajudantes*cfg.ajud);
+    const almocoQtd = +l.almoco||0; // tratando como quantidade
+    const pessoas = (+l.profissionais||0) + (+l.ajudantes||0);
+    const almocoTotal = almocoQtd * pessoas * (+cfg.almoco||0);
+    const translado = +l.translado||0;
+    return mat + mo + almocoTotal + translado;
+  }
   function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
-  // ======= Navegação entre abas (defensivo) =======
+  // ---------- Abas ----------
   qa('button[data-tab]').forEach(b=>{
+    if(!b.getAttribute('type')) b.setAttribute('type','button');
     b.addEventListener('click',()=>{
       qa('.tab').forEach(t=>t.classList.remove('active'));
-      const target = q('#'+b.dataset.tab);
-      if(target){ target.classList.add('active'); }
-      // renderizações on-demand
-      if(b.dataset.tab==='dashboard'){ renderAll(); }
-      if(b.dataset.tab==='lancamentos'){ fillOFSelects(); }
+      const tgt = q('#'+b.dataset.tab);
+      if(tgt) tgt.classList.add('active');
+      if(b.dataset.tab==='dashboard') renderAll();
+      if(b.dataset.tab==='lancamentos') fillOFSelects();
       if(b.dataset.tab==='ofs'){ renderOFs(); fillOFSelects(); }
-      if(b.dataset.tab==='config'){
-        const p = q('#cfgProf'); const a = q('#cfgAjud');
-        if(p) p.value = cfg.prof ?? 809;
-        if(a) a.value = cfg.ajud ?? 405;
-      }
+      if(b.dataset.tab==='config') ensureConfigUI();
     });
-    // garante que botões em forms não disparem submit
-    if(!b.getAttribute('type')) b.setAttribute('type','button');
   });
 
-  // ======= OFs =======
+  // ---------- OFs ----------
   function renderOFs(){
-    const wrap = q('#ofCards'); if(!wrap) return;
-    wrap.innerHTML='';
+    const wrap = q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapGastos = {};
     lanc.forEach(l => { mapGastos[l.of_id] = (mapGastos[l.of_id]||0) + gastoLanc(l); });
 
@@ -122,7 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const btnResetOFs = q('#btnResetOFs');
     if(btnResetOFs){
-      btnResetOFs.setAttribute('type','button');
       btnResetOFs.onclick = ()=>{
         if(confirm('Apagar TODAS as OFs? (lançamentos não serão apagados)')){
           ofs=[]; persistOFs(); renderOFs(); fillOFSelects(); renderAll();
@@ -131,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ======= Lançamentos =======
+  // ---------- Lançamentos ----------
   const form = q('#form');
   if(form){
     form.addEventListener('submit', (e)=>{
@@ -143,9 +145,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const materiais = +(q('#materiais')?.value||0);
       const profissionais = +(q('#profissionais')?.value||0);
       const ajudantes = +(q('#ajudantes')?.value||0);
-      const almoco = +(q('#almoco')?.value||0);
+      const almocoQtd = +(q('#almoco')?.value||0);  // tratado como quantidade (dias)
       const translado = +(q('#translado')?.value||0);
-      lanc.push({of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco, translado});
+      lanc.push({of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco: almocoQtd, translado});
       persistLanc();
       form.reset();
       alert('Lançamento adicionado.');
@@ -153,58 +155,60 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ======= Config =======
-  const btnSalvarCfg = q('#btnSalvarCfg');
-  if(btnSalvarCfg){
+  // ---------- Config (inclui R$/almoço por pessoa) ----------
+  function ensureConfigUI(){
     const ip = q('#cfgProf'), ia = q('#cfgAjud');
     if(ip) ip.value = cfg.prof ?? 809;
     if(ia) ia.value = cfg.ajud ?? 405;
-    btnSalvarCfg.setAttribute('type','button');
-    btnSalvarCfg.onclick = ()=>{
-      cfg.prof = +(ip?.value||0);
-      cfg.ajud = +(ia?.value||0);
-      persistCfg();
-      renderAll();
-    };
-    const btnResetar = q('#btnResetar');
-    if(btnResetar){
-      btnResetar.setAttribute('type','button');
-      btnResetar.onclick = ()=>{
-        if(confirm('Apagar TODOS os lançamentos?')){
-          lanc=[]; persistLanc(); renderAll();
-        }
+
+    // cria o campo de almoço se não existir no HTML
+    if(!q('#cfgAlmoco')){
+      const formCfg = q('#config .form') || q('#config');
+      if(formCfg){
+        const wrap = document.createElement('label');
+        wrap.className = 'small';
+        wrap.innerHTML = `R$/almoço (por pessoa)
+          <input type="number" id="cfgAlmoco" step="0.01" min="0" />`;
+        formCfg.insertBefore(wrap, formCfg.querySelector('.btn') || formCfg.lastChild);
+      }
+    }
+    const ic = q('#cfgAlmoco');
+    if(ic) ic.value = cfg.almoco ?? 35;
+
+    const btnSalvar = q('#btnSalvarCfg');
+    if(btnSalvar){
+      btnSalvar.onclick = ()=>{
+        cfg.prof = +(q('#cfgProf')?.value||0);
+        cfg.ajud = +(q('#cfgAjud')?.value||0);
+        cfg.almoco = +(q('#cfgAlmoco')?.value||0);
+        persistCfg();
+        renderAll();
       };
     }
   }
+  // chama uma vez para garantir o input novo
+  ensureConfigUI();
 
-  // ======= Filtros / Header =======
+  // ---------- Filtros ----------
   const btnFiltrar = q('#btnFiltrar');
-  if(btnFiltrar){
-    btnFiltrar.setAttribute('type','button');
-    btnFiltrar.onclick = ()=> renderAll();
-  }
+  if(btnFiltrar) btnFiltrar.onclick = ()=> renderAll();
   const btnLimpar = q('#btnLimpar');
-  if(btnLimpar){
-    btnLimpar.setAttribute('type','button');
-    btnLimpar.onclick = ()=>{
-      const de=q('#fDe'), ate=q('#fAte'), forn=q('#fFornecedor'), sel=q('#selOF');
-      if(de) de.value=''; if(ate) ate.value=''; if(forn) forn.value='';
-      if(sel) sel.value='__ALL__';
-      renderAll();
-    };
-  }
+  if(btnLimpar) btnLimpar.onclick = ()=>{
+    const de=q('#fDe'), ate=q('#fAte'), forn=q('#fFornecedor'), sel=q('#selOF');
+    if(de) de.value=''; if(ate) ate.value=''; if(forn) forn.value='';
+    if(sel) sel.value='__ALL__';
+    renderAll();
+  };
 
-  // ======= Import/Export CSV =======
+  // ---------- CSV ----------
   const btnExportar = q('#btnExportar');
   if(btnExportar){
-    btnExportar.setAttribute('type','button');
     btnExportar.onclick = ()=>{
       const rows = [['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado']];
       lanc.forEach(l=> rows.push([l.of_id,l.data,l.fornecedor,l.materiais,l.profissionais,l.ajudantes,l.almoco,l.translado]));
       const csv = rows.map(r=>r.map(v=> typeof v==='string' && v.includes(',') ? `"${v.replace(/"/g,'""')}"` : v).join(',')).join('\n');
-      const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = 'adequacoes_civis_v11.csv'; a.click();
+      const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'adequacoes_civis_v121.csv'; a.click();
     };
   }
   const inputCSV = q('#inputCSV');
@@ -228,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
           materiais: +cols[idx('materiais')]||0,
           profissionais: +cols[idx('profissionais')]||0,
           ajudantes: +cols[idx('ajudantes')]||0,
-          almoco: +cols[idx('almoco')]||0,
+          almoco: +cols[idx('almoco')]||0,   // interpretado como quantidade
           translado: +cols[idx('translado')]||0,
         };
         lanc.push(rec);
@@ -241,7 +245,6 @@ document.addEventListener('DOMContentLoaded', () => {
       persistOFs(); fillOFSelects(); renderOFs(); renderAll();
     });
   }
-
   function parseCsvLine(s){
     const out=[]; let cur=''; let q=false;
     for(let i=0;i<s.length;i++){
@@ -254,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return out.map(x=>x.trim());
   }
 
-  // ======= Agregadores =======
+  // ---------- Agregadores / tabelas / kpis ----------
   function filtrarDados(){
     const sel = q('#selOF')?.value || '__ALL__';
     const de = q('#fDe')?.value || null;
@@ -272,6 +275,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const tb = q('#tabela tbody'); if(!tb) return; tb.innerHTML = '';
     rows.forEach((l,idx)=>{
       const total = gastoLanc(l);
+      const almocoQtd = +l.almoco||0;
+      const pessoas = (+l.profissionais||0)+(+l.ajudantes||0);
+      const almocoTotal = almocoQtd * pessoas * (+cfg.almoco||0);
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(l.of_id||'')}</td>
@@ -280,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${BRL.format(l.materiais||0)}</td>
         <td>${l.profissionais||0}</td>
         <td>${l.ajudantes||0}</td>
-        <td>${BRL.format(l.almoco||0)}</td>
+        <td title="qtd x pessoas x R$">${almocoQtd} × ${pessoas} × ${BRL.format(+cfg.almoco||0)} = ${BRL.format(almocoTotal)}</td>
         <td>${BRL.format(l.translado||0)}</td>
         <td><b>${BRL.format(total)}</b></td>
         <td><button class="btn ghost" data-del="${idx}" type="button">Excluir</button></td>`;
@@ -294,19 +300,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderKpis(rows){
     const mat = sum(rows, r=> +r.materiais||0);
     const mo  = sum(rows, r=> r.profissionais*cfg.prof + r.ajudantes*cfg.ajud );
-    const ind = sum(rows, r=> +r.almoco + +r.translado);
+    const ind = sum(rows, r=> { const qtd=(+r.almoco||0); const ppl=(+r.profissionais||0)+(+r.ajudantes||0); return qtd*ppl*(+cfg.almoco||0) + (+r.translado||0); });
     const total = mat + mo + ind;
 
-    const setText = (sel, val)=>{ const el=q(sel); if(el) el.textContent = val; };
-    setText('#kpiMateriais', BRL.format(mat));
-    setText('#kpiMO', BRL.format(mo));
-    setText('#kpiIndiretos', BRL.format(ind));
-    setText('#kpiTotal', BRL.format(total));
-    setText('#kpiRegistros', rows.length ? `${rows.length} registros` : 'Sem registros');
-    setText('#kpiHh', `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`);
-    setText('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
+    const set = (sel, v)=>{ const el=q(sel); if(el) el.textContent = v; };
+    set('#kpiMateriais', BRL.format(mat));
+    set('#kpiMO', BRL.format(mo));
+    set('#kpiIndiretos', BRL.format(ind));
+    set('#kpiTotal', BRL.format(total));
+    set('#kpiRegistros', rows.length ? `${rows.length} registros` : 'Sem registros');
+    set('#kpiHh', `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`);
+    set('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
 
-    // Orçado/Saldo (pills)
+    // Orçado/Saldo
     const pillOrcado = q('#pillOrcado'), pillSaldo = q('#pillSaldo');
     if(pillOrcado && pillSaldo){
       const sel = q('#selOF')?.value || '__ALL__';
@@ -331,16 +337,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Gráficos (com destruição prévia)
+  // ---------- Gráficos ----------
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
+    // Evolução por dia: total geral
     const byDate = {}; rows.forEach(r=>{ const k=r.data||'—'; byDate[k]=(byDate[k]||0)+gastoLanc(r); });
+
+    // Categorias
     const cat = {
       'Materiais': sum(rows, r=> +r.materiais||0),
       'Mão de Obra': sum(rows, r=> r.profissionais*cfg.prof + r.ajudantes*cfg.ajud ),
-      'Indiretos': sum(rows, r=> +r.almoco + +r.translado),
+      // Indiretos = almoço por pessoa + translado
+      'Indiretos': sum(rows, r=> { const qtd=(+r.almoco||0); const ppl=(+r.profissionais||0)+(+r.ajudantes||0); return qtd*ppl*(+cfg.almoco||0) + (+r.translado||0); }),
     };
-    const byForn = {}; rows.forEach(r=>{ const k=r.fornecedor||'—'; byForn[k]=(byForn[k]||0)+gastoLanc(r); });
+
+    // Fornecedores: **somente Materiais** e ignorar materiais=0 e fornecedor vazio
+    const byForn = {};
+    rows.forEach(r=>{
+      const valorMat = +r.materiais||0;
+      const forn = (r.fornecedor||'').trim();
+      if(valorMat>0 && forn){ byForn[forn] = (byForn[forn]||0) + valorMat; }
+    });
 
     [chEvo,chCat,chForn].forEach(ch=> ch && ch.destroy());
 
@@ -361,13 +378,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const e3 = q('#graficoFornecedores'); if(e3){
       chForn = new Chart(e3.getContext('2d'), {
         type:'bar',
-        data:{ labels:Object.keys(byForn), datasets:[{ label:'Total por fornecedor', data:Object.values(byForn) }]},
+        data:{ labels:Object.keys(byForn), datasets:[{ label:'Materiais por fornecedor', data:Object.values(byForn) }]},
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
       });
     }
   }
 
-  // ======= Render all =======
   function renderAll(){
     fillOFSelects();
     const rows = filtrarDados();
@@ -376,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // ======= Seeds (opcionais) =======
+  // Seeds opcionais (mantive)
   if(ofs.length===0){
     ofs = [
       {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
@@ -386,16 +402,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if(lanc.length===0){
     lanc = [
-      {of_id:'OF-2025-001', data:'2025-09-09', fornecedor:'Bortolaso', materiais:344, profissionais:2, ajudantes:0, almoco:40, translado:25},
-      {of_id:'OF-2025-001', data:'2025-09-10', fornecedor:'—',        materiais:0,   profissionais:2, ajudantes:0, almoco:40, translado:25},
-      {of_id:'OF-2025-001', data:'2025-09-15', fornecedor:'Bortolaso', materiais:355, profissionais:2, ajudantes:0, almoco:40, translado:25},
-      {of_id:'OF-2025-002', data:'2025-09-16', fornecedor:'Bortolaso', materiais:86,  profissionais:2, ajudantes:0, almoco:40, translado:25},
+      {of_id:'OF-2025-001', data:'2025-09-09', fornecedor:'Bortolaso', materiais:344, profissionais:2, ajudantes:0, almoco:1, translado:25},
+      {of_id:'OF-2025-001', data:'2025-09-10', fornecedor:'—',        materiais:0,   profissionais:2, ajudantes:0, almoco:1, translado:25},
+      {of_id:'OF-2025-001', data:'2025-09-15', fornecedor:'Bortolaso', materiais:355, profissionais:2, ajudantes:0, almoco:1, translado:25},
+      {of_id:'OF-2025-002', data:'2025-09-16', fornecedor:'Bortolaso', materiais:86,  profissionais:2, ajudantes:0, almoco:1, translado:25},
     ];
     persistLanc();
   }
 
-  // Inicialização
-  try { renderOFs(); } catch(e){ console.warn('renderOFs:', e); }
-  try { renderAll(); } catch(e){ console.warn('renderAll:', e); }
-
-}); // DOMContentLoaded
+  // start
+  renderOFs();
+  renderAll();
+});
