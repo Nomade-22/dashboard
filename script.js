@@ -1,18 +1,20 @@
-// Dashboard Adequações Civis v1.4.3
-// Fix: Aba CONFIG completa (campos + máscaras BRL + salvar) e persistência
-// Mantém v1.4.2: fornecedores, PDF, CSV backup, almoço por pessoa, fds, filtros, etc.
+// Dashboard Adequações Civis v1.4.4
+// - Inputs BRL com focus/blur estáveis (funcionam em mobile/desktop)
+// - Excluir fornecedor remove referências nos lançamentos (não reaparece)
+// - Mantém: fornecedores (aliases/unificação), PDF, CSV backup simétrico,
+//   almoço por pessoa, multiplicadores fds, filtros, KPIs e gráficos.
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const KEY = 'adq_civis_lancamentos_v14';
-  const CFG_KEY = 'adq_civis_cfg_v14_3';
+  const CFG_KEY = 'adq_civis_cfg_v14_4';
   const OF_KEY = 'adq_civis_ofs_v11';
   const SUP_KEY = 'adq_civis_suppliers_v14';
 
   let cfg  = JSON.parse(localStorage.getItem(CFG_KEY) || JSON.stringify({
     prof: 809, ajud: 405,
     almoco: 45,
-    almoco_mode: 'por_pessoa', // 'por_pessoa' | 'qtd' | 'valor'
+    almoco_mode: 'por_pessoa',
     mult_sab: 1.5, mult_dom: 2.0
   }));
   let lanc = JSON.parse(localStorage.getItem(KEY) || '[]');
@@ -38,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
   function persistSup(){ localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
 
-  // --------- Fornecedores (normalização) ----------
+  // --------- Fornecedores ----------
   const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
   function canonicalSupplierName(input){
     const clean = normalize(input);
@@ -69,9 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const ppl = (+l.profissionais||0) + (+l.ajudantes||0);
     const v = +l.almoco||0;
     const mode = cfg.almoco_mode || 'por_pessoa';
-    if(mode==='valor') return v;                          // valor total
-    if(mode==='qtd')   return v * ppl * (+cfg.almoco||0); // qtd × pessoas × R$
-    return ppl * (+cfg.almoco||0);                        // por pessoa (ignora campo almoco)
+    if(mode==='valor') return v;
+    if(mode==='qtd')   return v * ppl * (+cfg.almoco||0);
+    return ppl * (+cfg.almoco||0);
   }
   function gastoLanc(l){
     const f = fatorDia(l.tipo_dia||'util');
@@ -90,9 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if(tgt) tgt.classList.add('active');
 
     if(id==='dashboard') renderAll();
-    if(id==='lancamentos'){ ensureTipoDiaField(); ensureFornecedorDatalist(); fillOFSelects(); applyMoneyMasks(); }
-    if(id==='ofs'){ renderOFs(); fillOFSelects(); ensureResetBtn(); applyMoneyMasks(); }
-    if(id==='config') { ensureConfigUI(true); applyMoneyMasks(); }
+    if(id==='lancamentos'){ ensureTipoDiaField(); ensureFornecedorDatalist(); fillOFSelects(); bindMoneyFields(); }
+    if(id==='ofs'){ renderOFs(); fillOFSelects(); ensureResetBtn(); bindMoneyFields(); }
+    if(id==='config') { ensureConfigUI(true); bindMoneyFields(); }
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
@@ -158,22 +160,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const dl = q('#fornList'); if(dl) dl.innerHTML = sups.map(s=> `<option value="${s.name}">`).join('');
   }
 
-  // --------- Máscara BRL ----------
-  function formatInputBRL(el){
-    el.classList.add('money');
-    const apply = ()=>{
-      let v = (el.value||'').toString().replace(/[^0-9]/g,'');
-      if(!v){ el.value=''; return; }
-      v = (parseInt(v,10)/100).toFixed(2);
-      v = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-      el.value = 'R$ '+v;
+  // --------- Inputs BRL (focus/blur) ----------
+  function bindMoneyField(el){
+    if(!el || el.dataset.moneyBound) return;
+    el.dataset.moneyBound = '1';
+
+    const toPlain = () => {
+      const v = num(el.value);
+      el.value = v ? String(v).replace('.', ',') : '';
     };
-    el.addEventListener('input', apply);
-    if(el.value) apply();
+    const toBRL = () => {
+      const v = num(el.value);
+      el.value = v ? BRL.format(v) : '';
+    };
+    const sanitizeInput = () => {
+      // Permite só dígitos, vírgula e ponto; remove o resto
+      let v = (el.value||'').replace(/[^\d,\.]/g,'');
+      // Se tiver vírgula e ponto, mantém o último como separador decimal
+      const lastComma = v.lastIndexOf(',');
+      const lastDot = v.lastIndexOf('.');
+      const decPos = Math.max(lastComma, lastDot);
+      if(decPos>=0){
+        const int = v.slice(0,decPos).replace(/[^\d]/g,'');
+        const dec = v.slice(decPos+1).replace(/[^\d]/g,'').slice(0,2);
+        v = int + (dec ? ','+dec : '');
+      }else{
+        v = v.replace(/[^\d]/g,'');
+      }
+      el.value = v;
+    };
+
+    el.addEventListener('focus', toPlain);
+    el.addEventListener('input', sanitizeInput);
+    el.addEventListener('blur', toBRL);
+
+    // formato inicial (se já tem valor)
+    if(el.value) toBRL();
   }
-  function applyMoneyMasks(){
+  function bindMoneyFields(){
     ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#translado'].forEach(sel=>{
-      const el=q(sel); if(el && !el.dataset.masked){ formatInputBRL(el); el.dataset.masked='1'; }
+      const el=q(sel); if(el) bindMoneyField(el);
     });
   }
 
@@ -289,31 +315,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --------- CONFIG (injeção garantida) ----------
+  // --------- CONFIG ----------
   function ensureConfigUI(forceOpen=false){
     const cont = q('#config'); if(!cont) return;
-    // se não há form, cria um
     let formCfg = cont.querySelector('.form');
     if(!formCfg){
       formCfg = document.createElement('div');
-      formCfg.className = 'form';
+      formCfg.className='form';
       cont.appendChild(formCfg);
     }
-    // helper para criar campo money
     const addMoney = (id,label)=>{
       if(q('#'+id)) return;
       const w = document.createElement('label'); w.className='small';
       w.innerHTML = `${label}<input type="text" id="${id}" class="money" />`;
       formCfg.appendChild(w);
     };
-    // helper para criar number
     const addNumber = (id,label,step='0.01')=>{
       if(q('#'+id)) return;
       const w = document.createElement('label'); w.className='small';
       w.innerHTML = `${label}<input type="number" id="${id}" step="${step}" min="0" />`;
       formCfg.appendChild(w);
     };
-    // helper select
     const addSelectMode = ()=>{
       if(q('#cfgAlmocoMode')) return;
       const w = document.createElement('label'); w.className='small';
@@ -325,15 +347,12 @@ document.addEventListener('DOMContentLoaded', () => {
         </select>`;
       formCfg.appendChild(w);
     };
-    // botão salvar
     if(!q('#btnSalvarCfg')){
-      const btns = document.createElement('div');
-      btns.className='btns';
+      const btns = document.createElement('div'); btns.className='btns';
       btns.innerHTML = `<button class="btn primary" id="btnSalvarCfg" type="button">Salvar</button>`;
       formCfg.appendChild(btns);
     }
 
-    // criar campos
     addMoney('cfgProf','R$/profissional (dias úteis)');
     addMoney('cfgAjud','R$/ajudante (dias úteis)');
     addMoney('cfgAlmoco','R$/almoço (por pessoa)');
@@ -341,8 +360,8 @@ document.addEventListener('DOMContentLoaded', () => {
     addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
     addSelectMode();
 
-    // setar valores atuais
-    const setMoney = (id, v)=>{ const el=q('#'+id); if(el){ el.value = BRL.format(+v||0); } };
+    // set valores
+    const setMoney = (id, v)=>{ const el=q('#'+id); if(el){ el.value = BRL.format(+v||0); bindMoneyField(el); } };
     setMoney('cfgProf', cfg.prof);
     setMoney('cfgAjud', cfg.ajud);
     setMoney('cfgAlmoco', cfg.almoco);
@@ -350,10 +369,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const md=q('#cfgMultDom'); if(md) md.value = cfg.mult_dom ?? 2.0;
     const im=q('#cfgAlmocoMode'); if(im) im.value = cfg.almoco_mode || 'por_pessoa';
 
-    // máscara BRL
-    applyMoneyMasks();
-
-    // salvar
     const btnSalvar = q('#btnSalvarCfg');
     if(btnSalvar && !btnSalvar.dataset.bound){
       btnSalvar.dataset.bound='1';
@@ -370,7 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     }
 
-    // Botão Exportar PDF (se ainda não tiver)
     if(!q('#btnExportPDF')){
       const tb = q('.toolbar');
       if(tb){
@@ -382,7 +396,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
-  ensureConfigUI();
 
   // --------- Fornecedores UI ----------
   function renderSupUI(){
@@ -411,9 +424,24 @@ document.addEventListener('DOMContentLoaded', () => {
         persistSup(); iNome.value=''; iAliases.value=''; renderSupUI(); ensureFornecedorDatalist();
       };
     }
+    // Excluir fornecedor: remove e LIMPA referências nos lançamentos
     list.querySelectorAll('[data-delsup]').forEach(b=>{
-      b.onclick = ()=>{ sups = sups.filter(s=> s.id!==b.dataset.delsup); persistSup(); renderSupUI(); ensureFornecedorDatalist(); };
+      b.onclick = ()=>{
+        const id = b.dataset.delsup;
+        const s = sups.find(x=>x.id===id);
+        sups = sups.filter(x=> x.id!==id);
+        persistSup();
+        if(s){
+          const allNames = [s.name, ...(s.aliases||[])].map(x=> normalize(x));
+          lanc.forEach(l=>{
+            if(allNames.includes(normalize(l.fornecedor||''))) l.fornecedor = '';
+          });
+          persistLanc();
+        }
+        renderSupUI(); ensureFornecedorDatalist(); renderAll();
+      };
     });
+    // Editar fornecedor (carrega nos inputs)
     list.querySelectorAll('[data-editsup]').forEach(b=>{
       b.onclick = ()=>{
         const s = sups.find(x=>x.id===b.dataset.editsup); if(!s) return;
@@ -440,9 +468,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnLimpar = q('#btnLimpar');
   if(btnLimpar){
     btnLimpar.onclick = ()=>{
-      const de=q('#fDe'), ate=q('#fAte'), forn=q('#fFornecedor'), sel=q('#selOF');
-      if(de) de.value=''; if(ate) ate.value=''; if(forn) forn.value='';
-      if(sel) sel.value='__ALL__';
+      const de=q','#fDe'; const ate=q('#fAte'); const forn=q('#fFornecedor'); const sel=q('#selOF');
+      if(q('#fDe')) q('#fDe').value=''; if(q('#fAte')) q('#fAte').value='';
+      if(forn) forn.value=''; if(sel) sel.value='__ALL__';
       renderAll();
     };
   }
@@ -659,7 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ensureSupFromLanc();
     ensureFornecedorDatalist();
     fillOFSelects();
-    applyMoneyMasks();
+    bindMoneyFields();
     const rows = filtrarDados();
     renderKpis(rows);
     renderCharts(rows);
@@ -679,7 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
       {id:uid(), of_id:'6519481', data:'2025-09-21', fornecedor:'Bortolaso Ltda', materiais:0, profissionais:4, ajudantes:3, almoco:0, translado:25, tipo_dia:'domingo'},
     ];
   }
-  ensureSupFromLanc();
+
   persistAll();
   renderOFs();
   renderAll();
