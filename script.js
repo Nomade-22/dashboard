@@ -1,11 +1,10 @@
-// Dashboard Adequações Civis v1.2.1 — ajustes: fornecedor só Materiais, almoço por pessoa, layout
+// Dashboard Adequações Civis v1.2.2 — import CSV robusto + ajustes anteriores
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const KEY = 'adq_civis_lancamentos_v11';
-  const CFG_KEY = 'adq_civis_cfg_v12';   // nova versão inclui cfg.almoco
+  const CFG_KEY = 'adq_civis_cfg_v12';   // inclui cfg.almoco
   const OF_KEY = 'adq_civis_ofs_v11';
 
-  // config com almoço por pessoa (default 35)
   let cfg  = JSON.parse(localStorage.getItem(CFG_KEY) || '{"prof":809,"ajud":405,"almoco":35}');
   let lanc = JSON.parse(localStorage.getItem(KEY) || '[]');
   let ofs  = JSON.parse(localStorage.getItem(OF_KEY)  || '[]');
@@ -14,18 +13,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
+  const num = (v)=> {
+    if (v==null) return 0;
+    // remove R$, espaços, milhar, troca vírgula decimal
+    const s = String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
+
   function persistLanc(){ localStorage.setItem(KEY, JSON.stringify(lanc)); }
   function persistCfg(){ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
   function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
 
   function findOF(id){ return ofs.find(o => o.id===id); }
-  // >>> almoço: campo #almoco agora é QUANTIDADE de dias; custo = qtd * (prof+ajud) * cfg.almoco
+  // almoço = qtd_dias * (prof+ajud) * cfg.almoco
   function gastoLanc(l){
     const mat = +l.materiais||0;
     const mo  = (l.profissionais*cfg.prof) + (l.ajudantes*cfg.ajud);
-    const almocoQtd = +l.almoco||0; // tratando como quantidade
     const pessoas = (+l.profissionais||0) + (+l.ajudantes||0);
-    const almocoTotal = almocoQtd * pessoas * (+cfg.almoco||0);
+    const almocoTotal = (+l.almoco||0) * pessoas * (+cfg.almoco||0);
     const translado = +l.translado||0;
     return mat + mo + almocoTotal + translado;
   }
@@ -50,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const wrap = q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapGastos = {};
     lanc.forEach(l => { mapGastos[l.of_id] = (mapGastos[l.of_id]||0) + gastoLanc(l); });
-
     ofs.forEach(of=>{
       const gasto = mapGastos[of.id]||0;
       const orc = +of.orcado||0;
@@ -115,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!id) return alert('Informe o Nº/ID da OF.');
       if(ofs.some(o=>o.id===id)) return alert('Já existe uma OF com esse ID.');
       const cliente=(q('#ofCliente')?.value||'').trim();
-      const orcado= +(q('#ofOrcado')?.value||0);
+      const orcado= num(q('#ofOrcado')?.value||0);
       const desc=(q('#ofDesc')?.value||'').trim();
       ofs.push({id, cliente, orcado, desc});
       persistOFs();
@@ -142,11 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!of_id){ alert('Selecione uma OF.'); return; }
       const data = q('#data')?.value || '';
       const fornecedor = (q('#fornecedor')?.value||'').trim();
-      const materiais = +(q('#materiais')?.value||0);
-      const profissionais = +(q('#profissionais')?.value||0);
-      const ajudantes = +(q('#ajudantes')?.value||0);
-      const almocoQtd = +(q('#almoco')?.value||0);  // tratado como quantidade (dias)
-      const translado = +(q('#translado')?.value||0);
+      const materiais = num(q('#materiais')?.value||0);
+      const profissionais = num(q('#profissionais')?.value||0);
+      const ajudantes = num(q('#ajudantes')?.value||0);
+      const almocoQtd = num(q('#almoco')?.value||0);  // quantidade (dias)
+      const translado = num(q('#translado')?.value||0);
       lanc.push({of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco: almocoQtd, translado});
       persistLanc();
       form.reset();
@@ -161,7 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(ip) ip.value = cfg.prof ?? 809;
     if(ia) ia.value = cfg.ajud ?? 405;
 
-    // cria o campo de almoço se não existir no HTML
     if(!q('#cfgAlmoco')){
       const formCfg = q('#config .form') || q('#config');
       if(formCfg){
@@ -169,88 +173,114 @@ document.addEventListener('DOMContentLoaded', () => {
         wrap.className = 'small';
         wrap.innerHTML = `R$/almoço (por pessoa)
           <input type="number" id="cfgAlmoco" step="0.01" min="0" />`;
-        formCfg.insertBefore(wrap, formCfg.querySelector('.btn') || formCfg.lastChild);
+        formCfg.insertBefore(wrap, formCfg.querySelector('.btns') || formCfg.lastChild);
       }
     }
-    const ic = q('#cfgAlmoco');
-    if(ic) ic.value = cfg.almoco ?? 35;
+    const ic = q('#cfgAlmoco'); if(ic) ic.value = cfg.almoco ?? 35;
 
     const btnSalvar = q('#btnSalvarCfg');
     if(btnSalvar){
       btnSalvar.onclick = ()=>{
-        cfg.prof = +(q('#cfgProf')?.value||0);
-        cfg.ajud = +(q('#cfgAjud')?.value||0);
-        cfg.almoco = +(q('#cfgAlmoco')?.value||0);
+        cfg.prof   = num(q('#cfgProf')?.value||0);
+        cfg.ajud   = num(q('#cfgAjud')?.value||0);
+        cfg.almoco = num(q('#cfgAlmoco')?.value||0);
         persistCfg();
         renderAll();
       };
     }
   }
-  // chama uma vez para garantir o input novo
   ensureConfigUI();
 
   // ---------- Filtros ----------
-  const btnFiltrar = q('#btnFiltrar');
-  if(btnFiltrar) btnFiltrar.onclick = ()=> renderAll();
+  const btnFiltrar = q('#btnFiltrar'); if(btnFiltrar) btnFiltrar.onclick = ()=> renderAll();
   const btnLimpar = q('#btnLimpar');
-  if(btnLimpar) btnLimpar.onclick = ()=>{
-    const de=q('#fDe'), ate=q('#fAte'), forn=q('#fFornecedor'), sel=q('#selOF');
-    if(de) de.value=''; if(ate) ate.value=''; if(forn) forn.value='';
-    if(sel) sel.value='__ALL__';
-    renderAll();
-  };
+  if(btnLimpar){
+    btnLimpar.onclick = ()=>{
+      const de=q('#fDe'), ate=q('#fAte'), forn=q('#fFornecedor'), sel=q('#selOF');
+      if(de) de.value=''; if(ate) ate.value=''; if(forn) forn.value='';
+      if(sel) sel.value='__ALL__';
+      renderAll();
+    };
+  }
 
-  // ---------- CSV ----------
+  // ---------- CSV (robusto) ----------
   const btnExportar = q('#btnExportar');
   if(btnExportar){
     btnExportar.onclick = ()=>{
       const rows = [['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado']];
       lanc.forEach(l=> rows.push([l.of_id,l.data,l.fornecedor,l.materiais,l.profissionais,l.ajudantes,l.almoco,l.translado]));
-      const csv = rows.map(r=>r.map(v=> typeof v==='string' && v.includes(',') ? `"${v.replace(/"/g,'""')}"` : v).join(',')).join('\n');
+      const csv = rows.map(r=>r.map(v=> typeof v==='string' && /[,;"]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v).join(',')).join('\n');
       const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = 'adequacoes_civis_v121.csv'; a.click();
+      a.href = URL.createObjectURL(blob); a.download = 'adequacoes_civis_v122.csv'; a.click();
     };
   }
+
   const inputCSV = q('#inputCSV');
   if(inputCSV){
     inputCSV.addEventListener('change', async (e)=>{
-      const file = e.target.files[0]; if(!file) return;
-      const txt = await file.text();
-      const lines = txt.trim().split(/\r?\n/);
-      const head = lines.shift().split(',').map(s=>s.trim().toLowerCase());
-      const idx = (k)=> head.indexOf(k);
-      const need = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado'];
-      const missing = need.filter(k=> idx(k)<0);
-      if(missing.length){ alert('Cabeçalho CSV faltando: '+missing.join(', ')); return; }
-      lines.forEach(line=>{
-        if(!line.trim()) return;
-        const cols = parseCsvLine(line);
-        const rec = {
-          of_id: cols[idx('of_id')]||'',
-          data: cols[idx('data')]||'',
-          fornecedor: cols[idx('fornecedor')]||'',
-          materiais: +cols[idx('materiais')]||0,
-          profissionais: +cols[idx('profissionais')]||0,
-          ajudantes: +cols[idx('ajudantes')]||0,
-          almoco: +cols[idx('almoco')]||0,   // interpretado como quantidade
-          translado: +cols[idx('translado')]||0,
-        };
-        lanc.push(rec);
-      });
-      persistLanc();
-      inputCSV.value='';
-      // garantir OFs referenciadas
-      const idsUsados = [...new Set(lanc.map(l=>l.of_id).filter(Boolean))];
-      idsUsados.forEach(id=>{ if(!ofs.some(o=>o.id===id)){ ofs.push({id, cliente:'', orcado:0, desc:''}); } });
-      persistOFs(); fillOFSelects(); renderOFs(); renderAll();
+      try{
+        const file = e.target.files[0]; if(!file) return;
+        let txt = await file.text();
+        if (txt.charCodeAt(0) === 0xFEFF) txt = txt.slice(1); // remove BOM
+
+        // detecta delimitador preferindo o que tiver mais colunas na primeira linha
+        const first = txt.split(/\r?\n/)[0] || '';
+        const delim = (first.split(';').length > first.split(',').length) ? ';' : ',';
+
+        const lines = txt.trim().split(/\r?\n/);
+        const head = lines.shift().split(delim).map(s=> s.trim().toLowerCase());
+        const idx = (k)=> head.indexOf(k);
+        // mapeia variações comuns de cabeçalho
+        const need = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado'];
+        // tolerância: "of", "ordem", "obra" mapeando para of_id
+        if(idx('of_id')<0){
+          const alt = ['of','ordem','ordem de fabricação','obra','centro de custo'];
+          for(const a of alt){ const p = idx(a); if(p>=0){ head[p] = 'of_id'; break; } }
+        }
+
+        const missing = need.filter(k=> idx(k)<0);
+        if(missing.length){
+          alert('Cabeçalho CSV faltando: '+missing.join(', ')+'\nUse: '+need.join(delim));
+          console.error('Head lido:', head);
+          return;
+        }
+
+        lines.forEach(line=>{
+          if(!line.trim()) return;
+          const cols = parseCsvLine(line, delim);
+          const rec = {
+            of_id: (cols[idx('of_id')]||'').trim(),
+            data: (cols[idx('data')]||'').trim(),
+            fornecedor: (cols[idx('fornecedor')]||'').trim(),
+            materiais: num(cols[idx('materiais')]),
+            profissionais: num(cols[idx('profissionais')]),
+            ajudantes: num(cols[idx('ajudantes')]),
+            almoco: num(cols[idx('almoco')]),      // quantidade (dias)
+            translado: num(cols[idx('translado')]),
+          };
+          lanc.push(rec);
+        });
+        persistLanc();
+        e.target.value='';
+
+        // garantir OFs
+        const idsUsados = [...new Set(lanc.map(l=>l.of_id).filter(Boolean))];
+        idsUsados.forEach(id=>{ if(!ofs.some(o=>o.id===id)){ ofs.push({id, cliente:'', orcado:0, desc:''}); } });
+        persistOFs(); fillOFSelects(); renderOFs(); renderAll();
+        alert('Importação concluída com sucesso!');
+      }catch(err){
+        console.error('Erro na importação CSV:', err);
+        alert('Não foi possível importar o CSV. Veja o console para detalhes.');
+      }
     });
   }
-  function parseCsvLine(s){
+
+  function parseCsvLine(s, delim){
     const out=[]; let cur=''; let q=false;
     for(let i=0;i<s.length;i++){
       const c=s[i];
-      if(c==='"' ){ if(q && s[i+1]==='"'){cur+='"'; i++;} else {q=!q;} }
-      else if(c===',' && !q){ out.push(cur); cur=''; }
+      if(c==='"'){ if(q && s[i+1]==='"'){cur+='"'; i++;} else {q=!q;} }
+      else if(c===delim && !q){ out.push(cur); cur=''; }
       else cur+=c;
     }
     out.push(cur);
@@ -302,7 +332,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const mo  = sum(rows, r=> r.profissionais*cfg.prof + r.ajudantes*cfg.ajud );
     const ind = sum(rows, r=> { const qtd=(+r.almoco||0); const ppl=(+r.profissionais||0)+(+r.ajudantes||0); return qtd*ppl*(+cfg.almoco||0) + (+r.translado||0); });
     const total = mat + mo + ind;
-
     const set = (sel, v)=>{ const el=q(sel); if(el) el.textContent = v; };
     set('#kpiMateriais', BRL.format(mat));
     set('#kpiMO', BRL.format(mo));
@@ -312,14 +341,12 @@ document.addEventListener('DOMContentLoaded', () => {
     set('#kpiHh', `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`);
     set('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
 
-    // Orçado/Saldo
     const pillOrcado = q('#pillOrcado'), pillSaldo = q('#pillSaldo');
     if(pillOrcado && pillSaldo){
       const sel = q('#selOF')?.value || '__ALL__';
       let orcado=0, gastoOF=0;
       if(sel && sel!=='__ALL__'){
-        const of = findOF(sel);
-        orcado = of ? (+of.orcado||0) : 0;
+        const of = findOF(sel); orcado = of ? (+of.orcado||0) : 0;
         gastoOF = sum(lanc.filter(l=>l.of_id===sel), l=>gastoLanc(l));
       } else {
         orcado = sum(ofs, o=> +o.orcado||0);
@@ -340,18 +367,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------- Gráficos ----------
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
-    // Evolução por dia: total geral
     const byDate = {}; rows.forEach(r=>{ const k=r.data||'—'; byDate[k]=(byDate[k]||0)+gastoLanc(r); });
-
-    // Categorias
     const cat = {
       'Materiais': sum(rows, r=> +r.materiais||0),
       'Mão de Obra': sum(rows, r=> r.profissionais*cfg.prof + r.ajudantes*cfg.ajud ),
-      // Indiretos = almoço por pessoa + translado
       'Indiretos': sum(rows, r=> { const qtd=(+r.almoco||0); const ppl=(+r.profissionais||0)+(+r.ajudantes||0); return qtd*ppl*(+cfg.almoco||0) + (+r.translado||0); }),
     };
-
-    // Fornecedores: **somente Materiais** e ignorar materiais=0 e fornecedor vazio
     const byForn = {};
     rows.forEach(r=>{
       const valorMat = +r.materiais||0;
@@ -392,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // Seeds opcionais (mantive)
+  // Seeds opcionais
   if(ofs.length===0){
     ofs = [
       {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
@@ -403,14 +424,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if(lanc.length===0){
     lanc = [
       {of_id:'OF-2025-001', data:'2025-09-09', fornecedor:'Bortolaso', materiais:344, profissionais:2, ajudantes:0, almoco:1, translado:25},
-      {of_id:'OF-2025-001', data:'2025-09-10', fornecedor:'—',        materiais:0,   profissionais:2, ajudantes:0, almoco:1, translado:25},
+      {of_id:'OF-2025-001', data:'2025-09-10', fornecedor:'',         materiais:0,   profissionais:2, ajudantes:0, almoco:1, translado:25},
       {of_id:'OF-2025-001', data:'2025-09-15', fornecedor:'Bortolaso', materiais:355, profissionais:2, ajudantes:0, almoco:1, translado:25},
       {of_id:'OF-2025-002', data:'2025-09-16', fornecedor:'Bortolaso', materiais:86,  profissionais:2, ajudantes:0, almoco:1, translado:25},
     ];
     persistLanc();
   }
 
-  // start
   renderOFs();
   renderAll();
 });
