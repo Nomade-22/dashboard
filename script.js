@@ -1,12 +1,11 @@
-// Dashboard Adequações Civis v1.4.5
-// Fix crítico: typo no btnLimpar (quebrava o bundle)
-// Mantém: máscaras BRL (focus/blur), excluir fornecedor limpando lançamentos,
-// filtros (OF/período/fornecedor), PDF, CSV simétrico, adicionais fds, KPIs/gráficos.
+// Dashboard Adequações Civis v1.4.6
+// Fixes: translado capturado e refletido nas OFs; Orçado (OF) com máscara BRL correta;
+// datas da dashboard exibidas em dd/mm/yyyy (tabela e gráficos).
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const KEY = 'adq_civis_lancamentos_v14';
-  const CFG_KEY = 'adq_civis_cfg_v14_5';
+  const CFG_KEY = 'adq_civis_cfg_v14_6';
   const OF_KEY = 'adq_civis_ofs_v11';
   const SUP_KEY = 'adq_civis_suppliers_v14';
 
@@ -21,7 +20,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const q  = (s)=>document.querySelector(s);
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
+
+  // Helpers num/BR date
   const num = (v)=>{ if(v==null) return 0; const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.'); const n=parseFloat(s); return isNaN(n)?0:n; };
+  const fmtBRDate = (iso)=> {
+    if(!iso) return '';
+    // espera "yyyy-mm-dd"
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if(!m) return iso;
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  };
 
   const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
   function canonicalSupplierName(input){
@@ -29,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for(const s of sups){ if(normalize(s.name)===clean) return s.name; if((s.aliases||[]).some(a=> normalize(a)===clean)) return s.name; }
     return (input||'').trim();
   }
+
   function persistAll(){ localStorage.setItem(KEY, JSON.stringify(lanc)); localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); localStorage.setItem(OF_KEY, JSON.stringify(ofs)); localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
   function persistLanc(){ localStorage.setItem(KEY, JSON.stringify(lanc)); }
   function persistCfg(){ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
@@ -45,10 +54,15 @@ document.addEventListener('DOMContentLoaded', () => {
     persistSup();
   }
 
+  // Cálculos
   function fatorDia(tipo){ if(tipo==='sabado') return +cfg.mult_sab||1.5; if(tipo==='domingo') return +cfg.mult_dom||2.0; return 1; }
   function almocoTotalDe(l){
-    const ppl=(+l.profissionais||0)+(+l.ajudantes||0); const v=+l.almoco||0; const mode=cfg.almoco_mode||'por_pessoa';
-    if(mode==='valor') return v; if(mode==='qtd') return v*ppl*(+cfg.almoco||0); return ppl*(+cfg.almoco||0);
+    const ppl=(+l.profissionais||0)+(+l.ajudantes||0);
+    const v=+l.almoco||0;
+    const mode=cfg.almoco_mode||'por_pessoa';
+    if(mode==='valor') return v;
+    if(mode==='qtd')   return v*ppl*(+cfg.almoco||0);
+    return ppl*(+cfg.almoco||0);
   }
   function gastoLanc(l){
     const f=fatorDia(l.tipo_dia||'util');
@@ -56,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0)+mo+almocoTotalDe(l)+(+l.translado||0);
   }
 
+  // Tabs
   document.addEventListener('click', (ev)=>{
     const b = ev.target.closest('button[data-tab]'); if(!b) return;
     ev.preventDefault(); qa('.tab').forEach(t=>t.classList.remove('active'));
@@ -67,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
+  // Injeta tab Fornecedores se faltar
   (function injectSuppliersTab(){
     if(!q('button[data-tab="fornecedores"]')){
       const tabs=q('.tabs'); if(tabs){ const btn=document.createElement('button'); btn.className='btn'; btn.dataset.tab='fornecedores'; btn.textContent='Fornecedores'; tabs.appendChild(btn); }
@@ -96,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
+  // Lançamentos UI
   function ensureTipoDiaField(){
     if(q('#tipoDia')) return;
     const container=q('#form')?.querySelector('.row2')||q('#form'); if(!container) return;
@@ -113,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dl=q('#fornList'); if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
   }
 
-  // Inputs BRL (focus/blur)
+  // Máscara BRL (focus/blur estável)
   function bindMoneyField(el){
     if(!el || el.dataset.moneyBound) return; el.dataset.moneyBound='1';
     const toPlain = ()=>{ const v=num(el.value); el.value = v ? String(v).replace('.',',') : ''; };
@@ -124,8 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('blur', toBRL);
     if(el.value) toBRL();
   }
-  function bindMoneyFields(){ ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#translado'].forEach(sel=>{ const el=q(sel); if(el) bindMoneyField(el); }); }
+  function bindMoneyFields(){
+    // inclui orçamento da OF, materiais, translado (ou transporte) e config
+    ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#translado','#transporte'].forEach(sel=>{
+      const el=q(sel); if(el) bindMoneyField(el);
+    });
+  }
 
+  // OFs
   function renderOFs(){
     const wrap=q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapG={}; lanc.forEach(l=>{ mapG[l.of_id]=(mapG[l.of_id]||0)+gastoLanc(l); });
@@ -165,21 +188,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if(sel2){ sel2.innerHTML=opts(true); if(!sel2.value) sel2.value='__ALL__'; }
   }
 
+  // Cadastro OF
   const formOF=q('#formOF');
   if(formOF){
+    bindMoneyFields(); // garante máscara no ofOrcado
     formOF.addEventListener('submit',(e)=>{
       e.preventDefault();
       const id=(q('#ofNumero')?.value||'').trim(); if(!id) return alert('Informe o Nº/ID da OF.');
       if(ofs.some(o=>o.id===id)) return alert('Já existe uma OF com esse ID.');
       const cliente=(q('#ofCliente')?.value||'').trim();
-      const orcado=num(q('#ofOrcado')?.value||0);
+      const orcado=num(q('#ofOrcado')?.value||0); // BRL -> número
       const desc=(q('#ofDesc')?.value||'').trim();
-      ofs.push({id,cliente,orcado,desc}); persistOFs(); formOF.reset(); renderOFs(); fillOFSelects(); alert('OF cadastrada.');
+      ofs.push({id,cliente,orcado,desc}); persistOFs();
+      formOF.reset(); renderOFs(); fillOFSelects();
+      alert('OF cadastrada.');
     });
   }
 
+  // Lançamentos
   const form=q('#form');
   if(form){
+    bindMoneyFields();
     form.addEventListener('submit',(e)=>{
       e.preventDefault();
       const of_id=q('#ofId')?.value; if(!of_id) return alert('Selecione uma OF.');
@@ -189,13 +218,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const profissionais=parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
       const ajudantes=parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
       const almocoInput=num(q('#almoco')?.value||0);
-      const translado=num(q('#translado')?.value||0);
+      // translado aceita #translado ou #transporte (compatibilidade)
+      const transladoEl = q('#translado') || q('#transporte');
+      const translado=num(transladoEl?.value||0);
       const tipo_dia=(q('#tipoDia')?.value)||'util';
-      lanc.push({id:uid(),of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco:almocoInput,translado,tipo_dia});
-      ensureSupFromLanc(); persistAll(); form.reset(); const td=q('#tipoDia'); if(td) td.value=tipo_dia; alert('Lançamento adicionado.'); renderAll();
+
+      lanc.push({id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia});
+      ensureSupFromLanc(); persistAll(); form.reset();
+      const td=q('#tipoDia'); if(td) td.value=tipo_dia;
+      alert('Lançamento adicionado.'); renderAll();
     });
   }
 
+  // Config
   function ensureConfigUI(forceOpen=false){
     const cont=q('#config'); if(!cont) return;
     let formCfg=cont.querySelector('.form'); if(!formCfg){ formCfg=document.createElement('div'); formCfg.className='form'; cont.appendChild(formCfg); }
@@ -227,10 +262,10 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.dataset.bound='1';
       btn.onclick=()=>{ cfg.prof=num(q('#cfgProf')?.value||0); cfg.ajud=num(q('#cfgAjud')?.value||0); cfg.almoco=num(q('#cfgAlmoco')?.value||0); cfg.mult_sab=parseFloat(q('#cfgMultSab')?.value||1.5); cfg.mult_dom=parseFloat(q('#cfgMultDom')?.value||2.0); cfg.almoco_mode=(q('#cfgAlmocoMode')?.value)||'por_pessoa'; persistCfg(); if(forceOpen) alert('Configurações salvas.'); renderAll(); };
     }
-
     if(!q('#btnExportPDF')){ const tb=q('.toolbar'); if(tb){ const b=document.createElement('button'); b.id='btnExportPDF'; b.className='btn'; b.textContent='Exportar PDF'; b.onclick=()=>window.print(); tb.appendChild(b); } }
   }
 
+  // Fornecedores
   function renderSupUI(){
     ensureSupFromLanc();
     const list=q('#supList'); if(!list) return; list.innerHTML='';
@@ -256,17 +291,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnUni) btnUni.onclick=()=>{ lanc.forEach(l=>{ l.fornecedor=canonicalSupplierName(l.fornecedor||''); }); persistLanc(); alert('Lançamentos unificados pelos fornecedores cadastrados.'); renderAll(); renderSupUI(); };
   }
 
-  const btnFiltrar=q('#btnFiltrar'); if(btnFiltrar) btnFiltrar.onclick=()=>renderAll();
+  // Filtros
+  const btnFiltrar=q('#btnFiltrar'); if(btnFiltrar) btnFiltrar.onclick=()=> renderAll();
   const btnLimpar=q('#btnLimpar');
   if(btnLimpar){
     btnLimpar.onclick=()=>{
-      const de=q('#fDe'); const ate=q('#fAte'); const forn=q('#fFornecedor'); const sel=q('#selOF'); // <-- fix aqui
+      const de=q('#fDe'); const ate=q('#fAte'); const forn=q('#fFornecedor'); const sel=q('#selOF');
       if(de) de.value=''; if(ate) ate.value=''; if(forn) forn.value='';
       if(sel) sel.value='__ALL__';
       renderAll();
     };
   }
 
+  // CSV backup simétrico
   const CSV_HEAD=['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
   const btnExportar=q('#btnExportar');
   if(btnExportar){
@@ -293,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function splitCsv(line){ const out=[]; let cur=''; let qd=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(ch==='"'){ if(qd && line[i+1]==='"'){cur+='"'; i++;} else qd=!qd; } else if(ch===',' && !qd){ out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); }
 
+  // Dados filtrados
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; const de=q('#fDe')?.value||null; const ate=q('#fAte')?.value||null; const forn=(q('#fFornecedor')?.value||'').toLowerCase().trim();
     return lanc.filter(l=>{
@@ -303,13 +341,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   }
 
+  // Tabela (datas em dd/mm/yyyy)
   function renderTable(rows){
     const tb=q('#tabela tbody'); if(!tb) return; tb.innerHTML='';
     rows.forEach(l=>{
       const total=gastoLanc(l), ppl=(+l.profissionais||0)+(+l.ajudantes||0), mode=cfg.almoco_mode||'por_pessoa', almTotal=almocoTotalDe(l);
       const almInfo=(mode==='valor')?`${BRL.format(almTotal)}`:(mode==='qtd')?`${l.almoco||0} × ${ppl} × ${BRL.format(+cfg.almoco||0)} = ${BRL.format(almTotal)}`:`${ppl} × ${BRL.format(+cfg.almoco||0)} = ${BRL.format(almTotal)}`;
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${l.of_id||''}</td><td>${l.data||''}</td><td>${canonicalSupplierName(l.fornecedor||'')}</td><td>${BRL.format(l.materiais||0)}</td><td>${l.profissionais||0}</td><td>${l.ajudantes||0}</td><td>${almInfo}</td><td>${BRL.format(l.translado||0)}</td><td><b>${BRL.format(total)}</b></td><td><button class="btn ghost" data-delid="${l.id||''}" type="button">Excluir</button></td>`;
+      tr.innerHTML=`<td>${l.of_id||''}</td><td>${fmtBRDate(l.data)||''}</td><td>${canonicalSupplierName(l.fornecedor||'')}</td><td>${BRL.format(l.materiais||0)}</td><td>${l.profissionais||0}</td><td>${l.ajudantes||0}</td><td>${almInfo}</td><td>${BRL.format(l.translado||0)}</td><td><b>${BRL.format(total)}</b></td><td><button class="btn ghost" data-delid="${l.id||''}" type="button">Excluir</button></td>`;
       tb.appendChild(tr);
     });
     tb.querySelectorAll('button[data-delid]').forEach(b=>{
@@ -317,6 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // KPIs
   function renderKpis(rows){
     const mat=sum(rows, r=> +r.materiais||0);
     const mo=sum(rows, r=>{ const f=fatorDia(r.tipo_dia||'util'); return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f; });
@@ -325,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const set=(sel,v)=>{ const el=q(sel); if(el) el.textContent=v; };
     set('#kpiMateriais', BRL.format(mat)); set('#kpiMO', BRL.format(mo)); set('#kpiIndiretos', BRL.format(ind)); set('#kpiTotal', BRL.format(total));
     set('#kpiRegistros', rows.length?`${rows.length} registros`:'Sem registros'); set('#kpiHh', `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`); set('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
+
     const pillOrcado=q('#pillOrcado'), pillSaldo=q('#pillSaldo');
     if(pillOrcado && pillSaldo){
       const sel=q('#selOF')?.value||'__ALL__'; let orcado=0, gastoOF=0;
@@ -336,30 +377,71 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Gráficos (datas dd/mm/yyyy nos labels)
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
-    const byDate={}; rows.forEach(r=>{ const k=r.data||'—'; byDate[k]=(byDate[k]||0)+gastoLanc(r); });
-    const cat={ 'Materiais':sum(rows, r=> +r.materiais||0), 'Mão de Obra':sum(rows, r=>{ const f=fatorDia(r.tipo_dia||'util'); return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f; }), 'Indiretos':sum(rows, r=> almocoTotalDe(r) + (+r.translado||0) ) };
-    const byForn={}; rows.forEach(r=>{ const vm=+r.materiais||0; const forn=canonicalSupplierName(r.fornecedor||''); if(vm>0&&forn){ byForn[forn]=(byForn[forn]||0)+vm; } });
+    // agrupa por data (chave ISO) para manter ordenação depois formata
+    const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
+    const dates = Object.keys(byDateRaw).sort(); // ISO ordena naturalmente
+    const labels = dates.map(d => d==='—' ? '—' : fmtBRDate(d));
+    const series = dates.map(d => byDateRaw[d]);
+
+    const cat = {
+      'Materiais': sum(rows, r=> +r.materiais||0),
+      'Mão de Obra': sum(rows, r=> {
+        const f = fatorDia(r.tipo_dia||'util');
+        return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f;
+      }),
+      'Indiretos': sum(rows, r=> almocoTotalDe(r) + (+r.translado||0)),
+    };
+    const byForn = {};
+    rows.forEach(r=>{
+      const vm=+r.materiais||0;
+      const forn=canonicalSupplierName(r.fornecedor||'');
+      if(vm>0&&forn){ byForn[forn]=(byForn[forn]||0)+vm; }
+    });
+
     [chEvo,chCat,chForn].forEach(ch=> ch && ch.destroy());
-    const e1=q('#graficoEvolucao'); if(e1){ chEvo=new Chart(e1.getContext('2d'),{ type:'line', data:{ labels:Object.keys(byDate), datasets:[{label:'Total por dia', data:Object.values(byDate), tension:.25 }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } } }); }
-    const e2=q('#graficoCategorias'); if(e2){ chCat=new Chart(e2.getContext('2d'),{ type:'doughnut', data:{ labels:Object.keys(cat), datasets:[{ data:Object.values(cat) }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } } }); }
-    const e3=q('#graficoFornecedores'); if(e3){ chForn=new Chart(e3.getContext('2d'),{ type:'bar', data:{ labels:Object.keys(byForn), datasets:[{ label:'Materiais por fornecedor', data:Object.values(byForn) }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } } }); }
+    const e1=q('#graficoEvolucao'); if(e1){
+      chEvo = new Chart(e1.getContext('2d'), { type:'line',
+        data:{ labels, datasets:[{ label:'Total por dia', data:series, tension:.25 }]},
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
+      });
+    }
+    const e2=q('#graficoCategorias'); if(e2){
+      chCat = new Chart(e2.getContext('2d'), { type:'doughnut',
+        data:{ labels:Object.keys(cat), datasets:[{ data:Object.values(cat) }]},
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
+      });
+    }
+    const e3=q('#graficoFornecedores'); if(e3){
+      chForn = new Chart(e3.getContext('2d'), { type:'bar',
+        data:{ labels:Object.keys(byForn), datasets:[{ label:'Materiais por fornecedor', data:Object.values(byForn) }]},
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
+      });
+    }
   }
 
-  function filtrarDados(){
-    const sel=q('#selOF')?.value||'__ALL__'; const de=q('#fDe')?.value||null; const ate=q('#fAte')?.value||null; const forn=(q('#fFornecedor')?.value||'').toLowerCase().trim();
-    return lanc.filter(l=>{
-      const okOF=(sel==='__ALL__') || (l.of_id===sel);
-      const okData=(!de || (l.data && l.data>=de)) && (!ate || (l.data && l.data<=ate));
-      const okForn=!forn || (canonicalSupplierName(l.fornecedor||'').toLowerCase().includes(forn));
-      return okOF && okData && okForn;
-    }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  function renderAll(){
+    ensureSupFromLanc();
+    ensureFornecedorDatalist();
+    fillOFSelects();
+    bindMoneyFields();
+    const rows=filtrarDados();
+    renderKpis(rows);
+    renderCharts(rows);
+    renderTable(rows);
   }
-  function renderAll(){ ensureFornecedorDatalist(); fillOFSelects(); bindMoneyFields(); const rows=filtrarDados(); renderKpis(rows); renderCharts(rows); renderTable(rows); }
 
-  if(ofs.length===0){ ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'}, {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ]; }
-  if(lanc.length===0){ lanc=[ {id:uid(), of_id:'6519481', data:'2025-09-19', fornecedor:'Bortolaso', materiais:20600, profissionais:4, ajudantes:2, almoco:0, translado:25, tipo_dia:'util'}, {id:uid(), of_id:'6519481', data:'2025-09-21', fornecedor:'Bortolaso Ltda', materiais:0, profissionais:4, ajudantes:3, almoco:0, translado:25, tipo_dia:'domingo'} ]; }
+  // Seeds (só pra não ficar vazio em ambiente novo)
+  if(ofs.length===0){
+    ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
+          {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
+  }
+  if(lanc.length===0){
+    lanc=[ {id:uid(), of_id:'6519481', data:'2025-09-19', fornecedor:'Bortolaso', materiais:20600, profissionais:4, ajudantes:2, almoco:0, translado:250, tipo_dia:'util'},
+           {id:uid(), of_id:'6519481', data:'2025-09-21', fornecedor:'Bortolaso Ltda', materiais:0, profissionais:4, ajudantes:3, almoco:0, translado:180, tipo_dia:'domingo'} ];
+  }
 
   persistAll();
   renderOFs();
