@@ -1,5 +1,5 @@
-// Dashboard Adequações Civis v1.4.6 (patch máscara BRL)
-// Mesma base da v1.4.6 estável. Patch: campos de dinheiro SEM travar a digitação.
+// Dashboard Adequações Civis v1.4.6 — HOTFIX MÁSCARA BRL (não-invasiva)
+// Mantém toda a base estável v1.4.6. Corrige entradas monetárias para digitar como "1.234,56".
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -20,7 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
-  // Helpers
+  // =========================
+  // FUNÇÕES AUXILIARES
+  // =========================
   const num = (v)=>{ if(v==null) return 0;
     const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
     const n=parseFloat(s); return isNaN(n)?0:n;
@@ -37,52 +39,42 @@ document.addEventListener('DOMContentLoaded', () => {
     return (input||'').trim();
   }
 
-  function persistAll(){ localStorage.setItem(KEY, JSON.stringify(lanc)); localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); localStorage.setItem(OF_KEY, JSON.stringify(ofs)); localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
+  const persistAll=()=>{ localStorage.setItem(KEY, JSON.stringify(lanc)); localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); localStorage.setItem(OF_KEY, JSON.stringify(ofs)); localStorage.setItem(SUP_KEY, JSON.stringify(sups)); };
   const persistLanc=()=>localStorage.setItem(KEY, JSON.stringify(lanc));
   const persistCfg =()=>localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
   const persistOFs =()=>localStorage.setItem(OF_KEY, JSON.stringify(ofs));
   const persistSup =()=>localStorage.setItem(SUP_KEY, JSON.stringify(sups));
 
   // =========================
-  // MÁSCARA BRL (anti-trava)
+  // HOTFIX MÁSCARA BRL (não mexe em type, não injeta "R$")
   // =========================
+  function brlFormatPlainFromDigits(digs){
+    if(!digs) return '0,00';
+    if(digs.length === 1) digs = '00' + digs;
+    if(digs.length === 2) digs = '0' + digs;
+    const int = digs.slice(0, -2);
+    const dec = digs.slice(-2);
+    const intFmt = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return `${intFmt},${dec}`;
+  }
+  const digitsOnly = (v)=> (v||'').replace(/\D/g,'');
+
   function moneyMaskBind(el){
     if(!el || el.dataset.moneyBound) return;
     el.dataset.moneyBound='1';
-
-    // força tipo texto para permitir "R$" sem bloquear (evita o bug do type=number)
-    try{ el.type = 'text'; }catch(e){}
-    el.classList.add('money');
-    el.setAttribute('inputmode','decimal');
-    el.setAttribute('autocomplete','off');
-
-    // Se vier vazio, mostra R$ 0,00
-    if(!el.value || /^\s*$/.test(el.value)) el.value = BRL.format(0);
-
-    // Funções auxiliares
-    const digitsOnly = (v)=> (v||'').replace(/\D/g,'');           // pega só números
-    const fmtBRL = (digits)=> {                                   // formata centavos -> BRL
-      if(!digits) return BRL.format(0);
-      const n = parseInt(digits,10);
-      return BRL.format(n/100);
-    };
-
-    // Ao digitar: mantém sempre BRL e cursor vai pro fim (comportamento estável em mobile)
+    if(!el.value || /^\s*$/.test(el.value)){
+      el.value = '0,00';
+    }else{
+      const d = digitsOnly(el.value);
+      el.value = brlFormatPlainFromDigits(d);
+    }
     el.addEventListener('input', () => {
       const d = digitsOnly(el.value);
-      el.value = fmtBRL(d);
+      el.value = brlFormatPlainFromDigits(d);
     });
-
-    // Foco: não some e não troca o tipo; apenas garante padrão
-    el.addEventListener('focus', () => {
-      if(!el.value) el.value = BRL.format(0);
-      // opcional: não seleciona tudo para não “sumir” em alguns teclados
-    });
-
-    // Blur: garante valor válido
     el.addEventListener('blur', () => {
       const d = digitsOnly(el.value);
-      el.value = fmtBRL(d);
+      el.value = brlFormatPlainFromDigits(d);
     });
   }
 
@@ -92,7 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // =========================
 
-  // Cálculos
+  // =========================
+  // CÁLCULOS
+  // =========================
   function fatorDia(tipo){ if(tipo==='sabado') return +cfg.mult_sab||1.5; if(tipo==='domingo') return +cfg.mult_dom||2.0; return 1; }
   function almocoTotalDe(l){
     const ppl=(+l.profissionais||0)+(+l.ajudantes||0);
@@ -108,7 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0)+mo+almocoTotalDe(l)+(+l.translado||0);
   }
 
-  // Tabs
+  // =========================
+  // TABS
+  // =========================
   document.addEventListener('click', (ev)=>{
     const b = ev.target.closest('button[data-tab]'); if(!b) return;
     ev.preventDefault(); qa('.tab').forEach(t=>t.classList.remove('active'));
@@ -120,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
-  // Injeta Fornecedores (se faltar)
+  // Injeta tab Fornecedores se faltar
   (function injectSuppliersTab(){
     if(!q('button[data-tab="fornecedores"]')){
       const tabs=q('.tabs'); if(tabs){ const btn=document.createElement('button'); btn.className='btn'; btn.dataset.tab='fornecedores'; btn.textContent='Fornecedores'; tabs.appendChild(btn); }
@@ -150,7 +146,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  // Lançamentos UI
+  // =========================
+  // LANÇAMENTOS UI
+  // =========================
   function ensureTipoDiaField(){
     if(q('#tipoDia')) return;
     const container=q('#form')?.querySelector('.row2')||q('#form'); if(!container) return;
@@ -168,7 +166,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const dl=q('#fornList'); if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
   }
 
+  // =========================
   // OFs
+  // =========================
   function renderOFs(){
     const wrap=q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapG={}; lanc.forEach(l=>{ mapG[l.of_id]=(mapG[l.of_id]||0)+gastoLanc(l); });
@@ -208,10 +208,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if(sel2){ sel2.innerHTML=opts(true); if(!sel2.value) sel2.value='__ALL__'; }
   }
 
-  // Cadastro OF
+  // =========================
+  // CADASTRO DE OF
+  // =========================
   const formOF=q('#formOF');
   if(formOF){
-    bindMoneyFields();
+    bindMoneyFields(); // máscara
     formOF.addEventListener('submit',(e)=>{
       e.preventDefault();
       const id=(q('#ofNumero')?.value||'').trim(); if(!id) return alert('Informe o Nº/ID da OF.');
@@ -225,7 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Lançamentos
+  // =========================
+  // LANÇAMENTOS (form principal)
+  // =========================
   const form=q('#form');
   if(form){
     bindMoneyFields();
@@ -253,7 +257,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Config
+  // =========================
+  // CONFIGURAÇÕES
+  // =========================
   function ensureConfigUI(forceOpen=false){
     const cont=q('#config'); if(!cont) return;
     let formCfg=cont.querySelector('.form'); if(!formCfg){ formCfg=document.createElement('div'); formCfg.className='form'; cont.appendChild(formCfg); }
@@ -274,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
     addSelect();
 
-    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=BRL.format(+v||0); moneyMaskBind(el); } };
+    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=Number.isFinite(+v)? (+(+v).toFixed(2)).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00'; moneyMaskBind(el); } };
     setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
     const ms=q('#cfgMultSab'); if(ms) ms.value=cfg.mult_sab??1.5;
     const md=q('#cfgMultDom'); if(md) md.value=cfg.mult_dom??2.0;
@@ -283,12 +289,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn=q('#btnSalvarCfg');
     if(btn && !btn.dataset.bound){
       btn.dataset.bound='1';
-      btn.onclick=()=>{ cfg.prof=num(q('#cfgProf')?.value||0); cfg.ajud=num(q('#cfgAjud')?.value||0); cfg.almoco=num(q('#cfgAlmoco')?.value||0); cfg.mult_sab=parseFloat(q('#cfgMultSab')?.value||1.5); cfg.mult_dom=parseFloat(q('#cfgMultDom')?.value||2.0); cfg.almoco_mode=(q('#cfgAlmocoMode')?.value)||'por_pessoa'; persistCfg(); if(forceOpen) alert('Configurações salvas.'); renderAll(); };
+      btn.onclick=()=>{ 
+        cfg.prof=num(q('#cfgProf')?.value||0);
+        cfg.ajud=num(q('#cfgAjud')?.value||0);
+        cfg.almoco=num(q('#cfgAlmoco')?.value||0);
+        cfg.mult_sab=parseFloat(q('#cfgMultSab')?.value||1.5);
+        cfg.mult_dom=parseFloat(q('#cfgMultDom')?.value||2.0);
+        cfg.almoco_mode=(q('#cfgAlmocoMode')?.value)||'por_pessoa';
+        persistCfg(); 
+        if(forceOpen) alert('Configurações salvas.');
+        renderAll();
+      };
     }
-    if(!q('#btnExportPDF')){ const tb=q('.toolbar'); if(tb){ const b=document.createElement('button'); b.id='btnExportPDF'; b.className='btn'; b.textContent='Exportar PDF'; b.onclick=()=>window.print(); tb.appendChild(b); } }
+    if(!q('#btnExportPDF')){ 
+      const tb=q('.toolbar'); 
+      if(tb){ const b=document.createElement('button'); b.id='btnExportPDF'; b.className='btn'; b.textContent='Exportar PDF'; b.onclick=()=>window.print(); tb.appendChild(b); } 
+    }
   }
 
-  // Fornecedores
+  // =========================
+  // FORNECEDORES (UI)
+  // =========================
+  function ensureSupFromLanc(){
+    const names = [...new Set(lanc.map(l=> (l.fornecedor||'').trim()).filter(Boolean))];
+    names.forEach(n=>{
+      if(!sups.some(s=> normalize(s.name)===normalize(n))){
+        sups.push({id: uid(), name: n, aliases: []});
+      }
+    });
+    persistSup();
+  }
+
   function renderSupUI(){
     ensureSupFromLanc();
     const list=q('#supList'); if(!list) return; list.innerHTML='';
@@ -300,21 +331,52 @@ document.addEventListener('DOMContentLoaded', () => {
       list.appendChild(div);
     });
     const btnAdd=q('#btnAddSup'), iNome=q('#supNome'), iAliases=q('#supAliases');
-    if(btnAdd) btnAdd.onclick=()=>{ const name=(iNome?.value||'').trim(); if(!name) return alert('Informe o nome do fornecedor.'); const al=(iAliases?.value||'').split(',').map(s=>s.trim()).filter(Boolean); if(sups.some(x=> normalize(x.name)===normalize(name))) return alert('Fornecedor já cadastrado.'); sups.push({id:uid(), name, aliases:al}); persistSup(); iNome.value=''; iAliases.value=''; renderSupUI(); ensureFornecedorDatalist(); };
+    if(btnAdd) btnAdd.onclick=()=>{ 
+      const name=(iNome?.value||'').trim(); 
+      if(!name) return alert('Informe o nome do fornecedor.'); 
+      const al=(iAliases?.value||'').split(',').map(s=>s.trim()).filter(Boolean); 
+      if(sups.some(x=> normalize(x.name)===normalize(name))) return alert('Fornecedor já cadastrado.'); 
+      sups.push({id:uid(), name, aliases:al}); persistSup(); iNome.value=''; iAliases.value=''; renderSupUI(); ensureFornecedorDatalist(); 
+    };
     list.querySelectorAll('[data-delsup]').forEach(b=>{
-      b.onclick=()=>{ const id=b.dataset.delsup; const s=sups.find(x=>x.id===id); sups=sups.filter(x=>x.id!==id); persistSup();
-        if(s){ const all=[s.name,...(s.aliases||[])].map(x=>normalize(x)); lanc.forEach(l=>{ if(all.includes(normalize(l.fornecedor||''))) l.fornecedor=''; }); persistLanc(); }
+      b.onclick=()=>{ 
+        const id=b.dataset.delsup; 
+        const s=sups.find(x=>x.id===id); 
+        sups=sups.filter(x=>x.id!==id); 
+        persistSup();
+        if(s){ 
+          const all=[s.name,...(s.aliases||[])].map(x=>normalize(x)); 
+          lanc.forEach(l=>{ if(all.includes(normalize(l.fornecedor||''))) l.fornecedor=''; }); 
+          persistLanc(); 
+        }
         renderSupUI(); ensureFornecedorDatalist(); renderAll();
       };
     });
     list.querySelectorAll('[data-editsup]').forEach(b=>{
-      b.onclick=()=>{ const s=sups.find(x=>x.id===b.dataset.editsup); if(!s) return; q('#supNome').value=s.name; q('#supAliases').value=(s.aliases||[]).join(', '); sups=sups.filter(x=>x.id!==s.id); persistSup(); renderSupUI(); ensureFornecedorDatalist(); };
+      b.onclick=()=>{ 
+        const s=sups.find(x=>x.id===b.dataset.editsup); 
+        if(!s) return; 
+        q('#supNome').value=s.name; 
+        q('#supAliases').value=(s.aliases||[]).join(', '); 
+        sups=sups.filter(x=>x.id!==s.id); 
+        persistSup(); 
+        renderSupUI(); 
+        ensureFornecedorDatalist(); 
+      };
     });
     const btnUni=q('#btnUnificar');
-    if(btnUni) btnUni.onclick=()=>{ lanc.forEach(l=>{ l.fornecedor=canonicalSupplierName(l.fornecedor||''); }); persistLanc(); alert('Lançamentos unificados pelos fornecedores cadastrados.'); renderAll(); renderSupUI(); };
+    if(btnUni) btnUni.onclick=()=>{ 
+      lanc.forEach(l=>{ l.fornecedor=canonicalSupplierName(l.fornecedor||''); }); 
+      persistLanc(); 
+      alert('Lançamentos unificados pelos fornecedores cadastrados.'); 
+      renderAll(); 
+      renderSupUI(); 
+    };
   }
 
-  // Filtros
+  // =========================
+  // FILTROS
+  // =========================
   const btnFiltrar=q('#btnFiltrar'); if(btnFiltrar) btnFiltrar.onclick=()=> renderAll();
   const btnLimpar=q('#btnLimpar');
   if(btnLimpar){
@@ -326,7 +388,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // CSV
+  // =========================
+  // CSV backup simétrico
+  // =========================
   const CSV_HEAD=['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
   const btnExportar=q('#btnExportar');
   if(btnExportar){
@@ -339,26 +403,34 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const inputCSV=q('#inputCSV');
   if(inputCSV){
-    inputCSV.removeAttribute('accept');
+    inputCSV.removeAttribute('accept'); // permite qualquer .csv
     inputCSV.addEventListener('change', async (e)=>{ const file=e.target.files[0]; if(!file) return; await handleCsvFile(file); inputCSV.value=''; });
   }
   async function handleCsvFile(file){
     try{
-      let txt=await file.text(); if(txt.charCodeAt(0)===0xFEFF) txt=txt.slice(1);
+      let txt=await file.text(); if(txt.charCodeAt(0)===0xFEFF) txt=txt.slice(1); // remove BOM
       const lines=txt.trim().split(/\r?\n/); if(!lines.length) return;
-      const head=splitCsv(lines.shift()); const map=CSV_HEAD.map(h=> head.indexOf(h)); if(map.some(i=> i<0)){ alert('Cabeçalho CSV inválido. Esperado: '+CSV_HEAD.join(',')); return; }
-      const imported=[]; lines.forEach(line=>{ if(!line.trim()) return; const c=splitCsv(line); imported.push({
-        id:uid(), of_id:c[map[0]].trim(), data:c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
-        materiais:num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
-        ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco:num(c[map[6]]),
-        translado:num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
-      }); });
+      const head=splitCsv(lines.shift());
+      const map=CSV_HEAD.map(h=> head.indexOf(h));
+      if(map.some(i=> i<0)){ alert('Cabeçalho CSV inválido. Esperado: '+CSV_HEAD.join(',')); return; }
+      const imported=[];
+      lines.forEach(line=>{
+        if(!line.trim()) return; const c=splitCsv(line);
+        imported.push({
+          id:uid(), of_id:c[map[0]].trim(), data:c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
+          materiais:num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
+          ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco:num(c[map[6]]),
+          translado:num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
+        });
+      });
       lanc=imported; ensureSupFromLanc(); persistAll(); alert('Backup restaurado com sucesso!'); renderAll();
     }catch(err){ console.error('Import CSV:', err); alert('Não foi possível importar o CSV.'); }
   }
   function splitCsv(line){ const out=[]; let cur=''; let qd=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(ch==='"'){ if(qd && line[i+1]==='"'){cur+='"'; i++;} else qd=!qd; } else if(ch===',' && !qd){ out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); }
 
-  // Filtro + Render
+  // =========================
+  // DADOS FILTRADOS
+  // =========================
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; const de=q('#fDe')?.value||null; const ate=q('#fAte')?.value||null; const forn=(q('#fFornecedor')?.value||'').toLowerCase().trim();
     return lanc.filter(l=>{
@@ -369,6 +441,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   }
 
+  // =========================
+  // TABELA
+  // =========================
   function renderTable(rows){
     const tb=q('#tabela tbody'); if(!tb) return; tb.innerHTML='';
     rows.forEach(l=>{
@@ -383,6 +458,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // =========================
+  // KPIs
+  // =========================
   function renderKpis(rows){
     const mat=sum(rows, r=> +r.materiais||0);
     const mo=sum(rows, r=>{ const f=fatorDia(r.tipo_dia||'util'); return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f; });
@@ -403,6 +481,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // =========================
+  // GRÁFICOS
+  // =========================
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
     const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
@@ -446,6 +527,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // =========================
+  // RENDER ALL
+  // =========================
   function renderAll(){
     ensureSupFromLanc();
     ensureFornecedorDatalist();
@@ -457,7 +541,9 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // Seeds
+  // =========================
+  // SEEDS (somente para ambiente "zerado")
+  // =========================
   if(ofs.length===0){
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
