@@ -1,5 +1,6 @@
-// Dashboard Adequações Civis v1.4.6 (patch máscara BRL)
-// Mesma base da v1.4.6 estável. Patch: campos de dinheiro SEM travar a digitação.
+// Dashboard Adequações Civis v1.4.6
+// Fixes: translado capturado e refletido nas OFs; Orçado (OF) com máscara BRL correta;
+// datas da dashboard exibidas em dd/mm/yyyy (tabela e gráficos).
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -20,16 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
-  // Helpers
-  const num = (v)=>{ if(v==null) return 0;
-    const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
-    const n=parseFloat(s); return isNaN(n)?0:n;
-  };
+  // Helpers num/BR date
+  const num = (v)=>{ if(v==null) return 0; const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.'); const n=parseFloat(s); return isNaN(n)?0:n; };
   const fmtBRDate = (iso)=> {
     if(!iso) return '';
+    // espera "yyyy-mm-dd"
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+    if(!m) return iso;
+    return `${m[3]}/${m[2]}/${m[1]}`;
   };
+
   const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
   function canonicalSupplierName(input){
     const clean = normalize(input); if(!clean) return '';
@@ -38,59 +39,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function persistAll(){ localStorage.setItem(KEY, JSON.stringify(lanc)); localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); localStorage.setItem(OF_KEY, JSON.stringify(ofs)); localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
-  const persistLanc=()=>localStorage.setItem(KEY, JSON.stringify(lanc));
-  const persistCfg =()=>localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
-  const persistOFs =()=>localStorage.setItem(OF_KEY, JSON.stringify(ofs));
-  const persistSup =()=>localStorage.setItem(SUP_KEY, JSON.stringify(sups));
+  function persistLanc(){ localStorage.setItem(KEY, JSON.stringify(lanc)); }
+  function persistCfg(){ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
+  function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
+  function persistSup(){ localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
 
-  // =========================
-  // MÁSCARA BRL (anti-trava)
-  // =========================
-  function moneyMaskBind(el){
-    if(!el || el.dataset.moneyBound) return;
-    el.dataset.moneyBound='1';
-
-    // força tipo texto para permitir "R$" sem bloquear (evita o bug do type=number)
-    try{ el.type = 'text'; }catch(e){}
-    el.classList.add('money');
-    el.setAttribute('inputmode','decimal');
-    el.setAttribute('autocomplete','off');
-
-    // Se vier vazio, mostra R$ 0,00
-    if(!el.value || /^\s*$/.test(el.value)) el.value = BRL.format(0);
-
-    // Funções auxiliares
-    const digitsOnly = (v)=> (v||'').replace(/\D/g,'');           // pega só números
-    const fmtBRL = (digits)=> {                                   // formata centavos -> BRL
-      if(!digits) return BRL.format(0);
-      const n = parseInt(digits,10);
-      return BRL.format(n/100);
-    };
-
-    // Ao digitar: mantém sempre BRL e cursor vai pro fim (comportamento estável em mobile)
-    el.addEventListener('input', () => {
-      const d = digitsOnly(el.value);
-      el.value = fmtBRL(d);
+  function ensureSupFromLanc(){
+    const names = [...new Set(lanc.map(l=> (l.fornecedor||'').trim()).filter(Boolean))];
+    names.forEach(n=>{
+      if(!sups.some(s=> normalize(s.name)===normalize(n))){
+        sups.push({id: uid(), name: n, aliases: []});
+      }
     });
-
-    // Foco: não some e não troca o tipo; apenas garante padrão
-    el.addEventListener('focus', () => {
-      if(!el.value) el.value = BRL.format(0);
-      // opcional: não seleciona tudo para não “sumir” em alguns teclados
-    });
-
-    // Blur: garante valor válido
-    el.addEventListener('blur', () => {
-      const d = digitsOnly(el.value);
-      el.value = fmtBRL(d);
-    });
+    persistSup();
   }
-
-  function bindMoneyFields(){
-    ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#material','#translado','#transporte']
-      .forEach(sel=>{ const el=q(sel); if(el) moneyMaskBind(el); });
-  }
-  // =========================
 
   // Cálculos
   function fatorDia(tipo){ if(tipo==='sabado') return +cfg.mult_sab||1.5; if(tipo==='domingo') return +cfg.mult_dom||2.0; return 1; }
@@ -120,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
-  // Injeta Fornecedores (se faltar)
+  // Injeta tab Fornecedores se faltar
   (function injectSuppliersTab(){
     if(!q('button[data-tab="fornecedores"]')){
       const tabs=q('.tabs'); if(tabs){ const btn=document.createElement('button'); btn.className='btn'; btn.dataset.tab='fornecedores'; btn.textContent='Fornecedores'; tabs.appendChild(btn); }
@@ -168,6 +130,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const dl=q('#fornList'); if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
   }
 
+  // Máscara BRL (focus/blur estável)
+  function bindMoneyField(el){
+    if(!el || el.dataset.moneyBound) return; el.dataset.moneyBound='1';
+    const toPlain = ()=>{ const v=num(el.value); el.value = v ? String(v).replace('.',',') : ''; };
+    const toBRL   = ()=>{ const v=num(el.value); el.value = v ? BRL.format(v) : ''; };
+    const sanitize = ()=>{ let v=(el.value||'').replace(/[^\d,\.]/g,''); const lc=v.lastIndexOf(','); const ld=v.lastIndexOf('.'); const p=Math.max(lc,ld); if(p>=0){ const int=v.slice(0,p).replace(/[^\d]/g,''); const dec=v.slice(p+1).replace(/[^\d]/g,'').slice(0,2); v=int+(dec?','+dec:''); } else { v=v.replace(/[^\d]/g,''); } el.value=v; };
+    el.addEventListener('focus', toPlain);
+    el.addEventListener('input', sanitize);
+    el.addEventListener('blur', toBRL);
+    if(el.value) toBRL();
+  }
+  function bindMoneyFields(){
+    // inclui orçamento da OF, materiais, translado (ou transporte) e config
+    ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#translado','#transporte'].forEach(sel=>{
+      const el=q(sel); if(el) bindMoneyField(el);
+    });
+  }
+
   // OFs
   function renderOFs(){
     const wrap=q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
@@ -211,16 +191,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cadastro OF
   const formOF=q('#formOF');
   if(formOF){
-    bindMoneyFields();
+    bindMoneyFields(); // garante máscara no ofOrcado
     formOF.addEventListener('submit',(e)=>{
       e.preventDefault();
       const id=(q('#ofNumero')?.value||'').trim(); if(!id) return alert('Informe o Nº/ID da OF.');
       if(ofs.some(o=>o.id===id)) return alert('Já existe uma OF com esse ID.');
       const cliente=(q('#ofCliente')?.value||'').trim();
-      const orcado=num(q('#ofOrcado')?.value||0);
+      const orcado=num(q('#ofOrcado')?.value||0); // BRL -> número
       const desc=(q('#ofDesc')?.value||'').trim();
       ofs.push({id,cliente,orcado,desc}); persistOFs();
-      formOF.reset(); bindMoneyFields(); renderOFs(); fillOFSelects();
+      formOF.reset(); renderOFs(); fillOFSelects();
       alert('OF cadastrada.');
     });
   }
@@ -234,20 +214,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const of_id=q('#ofId')?.value; if(!of_id) return alert('Selecione uma OF.');
       const data=q('#data')?.value||'';
       const fornecedor=canonicalSupplierName((q('#fornecedor')?.value||'').trim());
-
-      const matEl = q('#materiais') || q('#material');
-      const materiais=num(matEl?.value||0);
-
-      const transEl = q('#translado') || q('#transporte');
-      const translado=num(transEl?.value||0);
-
+      const materiais=num(q('#materiais')?.value||0);
       const profissionais=parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
       const ajudantes=parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
       const almocoInput=num(q('#almoco')?.value||0);
+      // translado aceita #translado ou #transporte (compatibilidade)
+      const transladoEl = q('#translado') || q('#transporte');
+      const translado=num(transladoEl?.value||0);
       const tipo_dia=(q('#tipoDia')?.value)||'util';
 
       lanc.push({id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia});
-      ensureSupFromLanc(); persistAll(); form.reset(); bindMoneyFields();
+      ensureSupFromLanc(); persistAll(); form.reset();
       const td=q('#tipoDia'); if(td) td.value=tipo_dia;
       alert('Lançamento adicionado.'); renderAll();
     });
@@ -274,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
     addSelect();
 
-    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=BRL.format(+v||0); moneyMaskBind(el); } };
+    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=BRL.format(+v||0); bindMoneyField(el); } };
     setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
     const ms=q('#cfgMultSab'); if(ms) ms.value=cfg.mult_sab??1.5;
     const md=q('#cfgMultDom'); if(md) md.value=cfg.mult_dom??2.0;
@@ -326,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // CSV
+  // CSV backup simétrico
   const CSV_HEAD=['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
   const btnExportar=q('#btnExportar');
   if(btnExportar){
@@ -358,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function splitCsv(line){ const out=[]; let cur=''; let qd=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(ch==='"'){ if(qd && line[i+1]==='"'){cur+='"'; i++;} else qd=!qd; } else if(ch===',' && !qd){ out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); }
 
-  // Filtro + Render
+  // Dados filtrados
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; const de=q('#fDe')?.value||null; const ate=q('#fAte')?.value||null; const forn=(q('#fFornecedor')?.value||'').toLowerCase().trim();
     return lanc.filter(l=>{
@@ -369,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   }
 
+  // Tabela (datas em dd/mm/yyyy)
   function renderTable(rows){
     const tb=q('#tabela tbody'); if(!tb) return; tb.innerHTML='';
     rows.forEach(l=>{
@@ -383,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // KPIs
   function renderKpis(rows){
     const mat=sum(rows, r=> +r.materiais||0);
     const mo=sum(rows, r=>{ const f=fatorDia(r.tipo_dia||'util'); return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f; });
@@ -403,10 +382,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Gráficos (datas dd/mm/yyyy nos labels)
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
+    // agrupa por data (chave ISO) para manter ordenação depois formata
     const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
-    const dates = Object.keys(byDateRaw).sort();
+    const dates = Object.keys(byDateRaw).sort(); // ISO ordena naturalmente
     const labels = dates.map(d => d==='—' ? '—' : fmtBRDate(d));
     const series = dates.map(d => byDateRaw[d]);
 
@@ -457,7 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // Seeds
+  // Seeds (só pra não ficar vazio em ambiente novo)
   if(ofs.length===0){
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
