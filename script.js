@@ -1,6 +1,6 @@
-// Dashboard Adequações Civis v2.0
-// Unifica máscara BRL (1.234,56, sem "R$") em TODAS as entradas monetárias.
-// Mantém translado refletido nas OFs; Orçado (OF) correto; datas dd/mm/yyyy (tabela e gráficos).
+// Dashboard Adequações Civis v2.1
+// Máscara BRL reescrita com buffer de dígitos (apaga corretamente, digitação e colagem estáveis).
+// Mantém translado nas OFs, orçado correto e datas dd/mm/yyyy.
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -21,17 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
-  // Helpers num/BR date
   const num = (v)=>{ 
     if(v==null) return 0; 
-    const s=String(v)
-      .replace(/\uFEFF/g,'')
-      .replace(/R\$\s?/gi,'')
-      .replace(/\./g,'')
-      .replace(/\s+/g,'')
-      .replace(',', '.');
-    const n=parseFloat(s); 
-    return isNaN(n)?0:n; 
+    const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
+    const n=parseFloat(s); return isNaN(n)?0:n; 
   };
   const fmtBRDate = (iso)=> {
     if(!iso) return '';
@@ -70,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     persistSup();
   }
 
-  // Cálculos
+  // ==== Cálculos
   function fatorDia(tipo){ 
     if(tipo==='sabado') return +cfg.mult_sab||1.5; 
     if(tipo==='domingo') return +cfg.mult_dom||2.0; 
@@ -90,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0)+mo+almocoTotalDe(l)+(+l.translado||0);
   }
 
-  // Tabs
+  // ==== Tabs
   document.addEventListener('click', (ev)=>{
     const b = ev.target.closest('button[data-tab]'); if(!b) return;
     ev.preventDefault(); qa('.tab').forEach(t=>t.classList.remove('active'));
@@ -102,22 +95,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
-  // Injeta tab Fornecedores se faltar
+  // Injeta tab Fornecedores
   (function injectSuppliersTab(){
     if(!q('button[data-tab="fornecedores"]')){
       const tabs=q('.tabs'); 
       if(tabs){ 
         const btn=document.createElement('button'); 
-        btn.className='btn'; 
-        btn.dataset.tab='fornecedores'; 
-        btn.textContent='Fornecedores'; 
+        btn.className='btn'; btn.dataset.tab='fornecedores'; btn.textContent='Fornecedores'; 
         tabs.appendChild(btn); 
       }
     }
     if(!q('#fornecedores')){
       const m=document.createElement('section'); 
-      m.id='fornecedores'; 
-      m.className='tab card';
+      m.id='fornecedores'; m.className='tab card';
       m.innerHTML=`
         <h2>Cadastro de Fornecedores</h2>
         <div class="form" style="margin-top:10px">
@@ -141,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  // Lançamentos UI
+  // ==== Lançamentos UI
   function ensureTipoDiaField(){
     if(q('#tipoDia')) return;
     const container=q('#form')?.querySelector('.row2')||q('#form'); if(!container) return;
@@ -163,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
   }
 
-  // === MÁSCARA BRL — mesma máscara da alimentação para TODAS as entradas de dinheiro ===
+  // ==== MÁSCARA BRL COM BUFFER DE DÍGITOS (apaga corretamente)
   function forceTextInput(el){
     if(!el) return el;
     if((el.type||'').toLowerCase() === 'text') return el;
@@ -175,57 +165,94 @@ document.addEventListener('DOMContentLoaded', () => {
       return rep;
     }
   }
+  const onlyDigits = (v)=> (v||'').replace(/\D/g,'');
   function brlFormatFromDigits(digs){
-    if(!digs) return '0,00';
-    if(digs.length === 1) digs = '00' + digs;
-    if(digs.length === 2) digs = '0' + digs;
-    const int = digs.slice(0, -2);
+    if(!digs || digs==='0') digs='0';
+    // evita alongar demais (até 15 dígitos ~ trilhões)
+    digs = digs.replace(/^0+(?=\d)/,''); // tira zeros à esquerda
+    if(digs.length === 1) digs = '0' + digs;      // 0x -> 0x (centavos)
+    const int = digs.slice(0, -2) || '0';
     const dec = digs.slice(-2);
     const intFmt = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     return `${intFmt},${dec}`;
   }
-  const onlyDigits = (v)=> (v||'').replace(/\D/g,'');
 
   function moneyMaskBind(el){
     if(!el) return;
-    // força TEXT para permitir digitar vírgula e pontos de milhar
     el = forceTextInput(el);
     if(el.dataset.moneyBound) return;
     el.dataset.moneyBound = '1';
 
-    // normaliza valor inicial
-    const d0 = onlyDigits(el.value);
-    el.value = brlFormatFromDigits(d0);
+    // estado interno de dígitos (centavos)
+    let digs = onlyDigits(el.value);
+    if(!digs) digs = '0';
+    el.value = brlFormatFromDigits(digs);
 
-    el.addEventListener('input', () => {
-      const d = onlyDigits(el.value);
-      el.value = brlFormatFromDigits(d);
+    // ajuda mobile: sempre cursor no fim
+    function putCaretEnd(){ try{ el.selectionStart = el.selectionEnd = el.value.length; }catch{} }
+
+    el.addEventListener('keydown', (ev)=>{
+      el.dataset.lastKey = ev.key || '';
     });
 
-    el.addEventListener('blur', () => {
-      const d = onlyDigits(el.value);
-      el.value = brlFormatFromDigits(d);
+    el.addEventListener('input', (ev)=>{
+      const t = ev.inputType || '';
+      const k = el.dataset.lastKey || '';
+      const data = ev.data || '';
+
+      // ações principais
+      if(t === 'deleteContentBackward' || k === 'Backspace'){
+        digs = digs.slice(0, -1); if(!digs) digs='0';
+      } else if(t === 'deleteContentForward' || k === 'Delete'){
+        // mesmo comportamento: apaga 1 dígito do fim
+        digs = digs.slice(0, -1); if(!digs) digs='0';
+      } else if(t === 'insertFromPaste'){
+        const pasted = (ev.clipboardData && ev.clipboardData.getData('text')) || el.value;
+        const pd = onlyDigits(pasted);
+        digs = pd || '0';
+      } else if(t === 'insertText'){
+        if(/\d/.test(data)){
+          digs = (digs==='0' ? data : (digs + data));
+        } else {
+          // ignora vírgula/ponto, letras etc
+        }
+      } else {
+        // fallback (navegadores sem inputType): reconstrói a partir do valor
+        const d = onlyDigits(el.value);
+        digs = d || '0';
+      }
+
+      // limita tamanho para evitar overflow visual
+      if(digs.length > 15) digs = digs.slice(0,15);
+
+      el.value = brlFormatFromDigits(digs);
+      putCaretEnd();
+    });
+
+    el.addEventListener('blur', ()=>{
+      // garante formatação final
+      el.value = brlFormatFromDigits(digs);
     });
   }
 
   function bindMoneyFields(){
     [
-      '#materiais',   // Lançamentos
-      '#material',    // (compat)
+      '#materiais',
+      '#material',
       '#translado',
-      '#transporte',  // (compat)
-      '#almoco',      // Alimentação (já era a referência)
-      '#ofOrcado',    // Cadastro de OF
-      '#cfgProf',     // Config
+      '#transporte',
+      '#almoco',
+      '#ofOrcado',
+      '#cfgProf',
       '#cfgAjud',
       '#cfgAlmoco'
     ].forEach(sel => {
-      let el = document.querySelector(sel);
+      const el = document.querySelector(sel);
       if(el) moneyMaskBind(el);
     });
   }
 
-  // OFs
+  // ==== OFs
   function renderOFs(){
     const wrap=q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapG={}; lanc.forEach(l=>{ mapG[l.of_id]=(mapG[l.of_id]||0)+gastoLanc(l); });
@@ -274,16 +301,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if(sel2){ sel2.innerHTML=opts(true); if(!sel2.value) sel2.value='__ALL__'; }
   }
 
-  // Cadastro OF
+  // ==== Cadastro OF
   const formOF=q('#formOF');
   if(formOF){
-    bindMoneyFields(); // garante máscara no ofOrcado
+    bindMoneyFields();
     formOF.addEventListener('submit',(e)=>{
       e.preventDefault();
       const id=(q('#ofNumero')?.value||'').trim(); if(!id) return alert('Informe o Nº/ID da OF.');
       if(ofs.some(o=>o.id===id)) return alert('Já existe uma OF com esse ID.');
       const cliente=(q('#ofCliente')?.value||'').trim();
-      const orcado=num(q('#ofOrcado')?.value||0); // BRL -> número
+      const orcado=num(q('#ofOrcado')?.value||0);
       const desc=(q('#ofDesc')?.value||'').trim();
       ofs.push({id,cliente,orcado,desc}); persistOFs();
       formOF.reset(); renderOFs(); fillOFSelects();
@@ -291,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Lançamentos
+  // ==== Lançamentos
   const form=q('#form');
   if(form){
     bindMoneyFields();
@@ -315,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Config
+  // ==== Config
   function ensureConfigUI(forceOpen=false){
     const cont=q('#config'); if(!cont) return;
     let formCfg=cont.querySelector('.form'); 
@@ -360,7 +387,6 @@ document.addEventListener('DOMContentLoaded', () => {
     addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
     addSelect();
 
-    // aplica máscara (todos os três são "money" e serão forçados para text)
     const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value = (+v||0).toFixed(2).replace('.',','); moneyMaskBind(el); } };
     setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
 
@@ -396,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Fornecedores
+  // ==== Fornecedores
   function renderSupUI(){
     ensureSupFromLanc();
     const list=q('#supList'); if(!list) return; list.innerHTML='';
@@ -451,7 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // Filtros
+  // ==== Filtros
   const btnFiltrar=q('#btnFiltrar'); if(btnFiltrar) btnFiltrar.onclick=()=> renderAll();
   const btnLimpar=q('#btnLimpar');
   if(btnLimpar){
@@ -463,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // CSV backup simétrico
+  // ==== CSV backup simétrico
   const CSV_HEAD=['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
   const btnExportar=q('#btnExportar');
   if(btnExportar){
@@ -481,7 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const inputCSV=q('#inputCSV');
   if(inputCSV){
-    inputCSV.removeAttribute('accept'); // permite qualquer .csv
+    inputCSV.removeAttribute('accept');
     inputCSV.addEventListener('change', async (e)=>{ 
       const file=e.target.files[0]; 
       if(!file) return; 
@@ -492,57 +518,38 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleCsvFile(file){
     try{
       let txt=await file.text(); 
-      if(txt.charCodeAt(0)===0xFEFF) txt=txt.slice(1); // remove BOM
+      if(txt.charCodeAt(0)===0xFEFF) txt=txt.slice(1);
       const lines=txt.trim().split(/\r?\n/); if(!lines.length) return;
       const head=splitCsv(lines.shift()); 
       const map=CSV_HEAD.map(h=> head.indexOf(h)); 
-      if(map.some(i=> i<0)){ 
-        alert('Cabeçalho CSV inválido. Esperado: '+CSV_HEAD.join(',')); 
-        return; 
-      }
+      if(map.some(i=> i<0)){ alert('Cabeçalho CSV inválido. Esperado: '+CSV_HEAD.join(',')); return; }
       const imported=[];
       lines.forEach(line=>{
         if(!line.trim()) return; 
         const c=splitCsv(line); 
         imported.push({
-          id:uid(), 
-          of_id:c[map[0]].trim(), 
-          data:c[map[1]].trim(), 
-          fornecedor:canonicalSupplierName(c[map[2]].trim()),
-          materiais:num(c[map[3]]), 
-          profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
-          ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, 
-          almoco:num(c[map[6]]),
-          translado:num(c[map[7]]), 
-          tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
+          id:uid(), of_id:c[map[0]].trim(), data:c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
+          materiais:num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
+          ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco:num(c[map[6]]),
+          translado:num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
         });
       });
-      lanc=imported; 
-      ensureSupFromLanc(); 
-      persistAll(); 
-      alert('Backup restaurado com sucesso!'); 
-      renderAll();
-    }catch(err){ 
-      console.error('Import CSV:', err); 
-      alert('Não foi possível importar o CSV.'); 
-    }
+      lanc=imported; ensureSupFromLanc(); persistAll(); alert('Backup restaurado com sucesso!'); renderAll();
+    }catch(err){ console.error('Import CSV:', err); alert('Não foi possível importar o CSV.'); }
   }
   function splitCsv(line){ 
     const out=[]; let cur=''; let qd=false; 
     for(let i=0;i<line.length;i++){ 
       const ch=line[i]; 
-      if(ch==='"'){ 
-        if(qd && line[i+1]==='"'){cur+='"'; i++;} 
-        else qd=!qd; 
-      } else if(ch===',' && !qd){ 
-        out.push(cur); cur=''; 
-      } else cur+=ch; 
+      if(ch==='"'){ if(qd && line[i+1]==='"'){cur+='"'; i++;} else qd=!qd; } 
+      else if(ch===',' && !qd){ out.push(cur); cur=''; } 
+      else cur+=ch; 
     } 
     out.push(cur); 
     return out.map(s=>s.trim()); 
   }
 
-  // Dados filtrados
+  // ==== Dados filtrados
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; 
     const de=q('#fDe')?.value||null; 
@@ -556,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   }
 
-  // Tabela (datas em dd/mm/yyyy)
+  // ==== Tabela
   function renderTable(rows){
     const tb=q('#tabela tbody'); if(!tb) return; tb.innerHTML='';
     rows.forEach(l=>{
@@ -592,7 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // KPIs
+  // ==== KPIs
   function renderKpis(rows){
     const mat=sum(rows, r=> +r.materiais||0);
     const mo=sum(rows, r=>{ 
@@ -636,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Gráficos (datas dd/mm/yyyy nos labels)
+  // ==== Gráficos
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
     const byDateRaw={}; 
@@ -692,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // Seeds (apenas para ambiente novo)
+  // Seeds (ambiente novo)
   if(ofs.length===0){
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
