@@ -1,5 +1,5 @@
-// Dashboard Adequações Civis v1.4.6-live-mask
-// Igual à v1.4.6, mas com máscara BRL ao digitar (não some valor).
+// Dashboard Adequações Civis v1.4.6 (patch máscara BRL)
+// Mesma base da v1.4.6 estável. Patch: campos de dinheiro SEM travar a digitação.
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -20,24 +20,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
-  // Helpers num/BR date
-  const num = (v)=>{
-    if(v==null) return 0;
-    const s=String(v)
-      .replace(/\uFEFF/g,'')
-      .replace(/R\$\s?/gi,'')
-      .replace(/\./g,'')        // milhar
-      .replace(/\s+/g,'')
-      .replace(',', '.');       // decimal
-    const n=parseFloat(s);
-    return isNaN(n)?0:n;
+  // Helpers
+  const num = (v)=>{ if(v==null) return 0;
+    const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
+    const n=parseFloat(s); return isNaN(n)?0:n;
   };
   const fmtBRDate = (iso)=> {
     if(!iso) return '';
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
     return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
   };
-
   const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
   function canonicalSupplierName(input){
     const clean = normalize(input); if(!clean) return '';
@@ -46,64 +38,59 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function persistAll(){ localStorage.setItem(KEY, JSON.stringify(lanc)); localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); localStorage.setItem(OF_KEY, JSON.stringify(ofs)); localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
-  function persistLanc(){ localStorage.setItem(KEY, JSON.stringify(lanc)); }
-  function persistCfg(){ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
-  function persistOFs(){ localStorage.setItem(OF_KEY, JSON.stringify(ofs)); }
-  function persistSup(){ localStorage.setItem(SUP_KEY, JSON.stringify(sups)); }
+  const persistLanc=()=>localStorage.setItem(KEY, JSON.stringify(lanc));
+  const persistCfg =()=>localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+  const persistOFs =()=>localStorage.setItem(OF_KEY, JSON.stringify(ofs));
+  const persistSup =()=>localStorage.setItem(SUP_KEY, JSON.stringify(sups));
 
-  function ensureSupFromLanc(){
-    const names = [...new Set(lanc.map(l=> (l.fornecedor||'').trim()).filter(Boolean))];
-    names.forEach(n=>{
-      if(!sups.some(s=> normalize(s.name)===normalize(n))){
-        sups.push({id: uid(), name: n, aliases: []});
-      }
-    });
-    persistSup();
-  }
-
-  // =======================
-  // MÁSCARA BRL AO DIGITAR
-  // =======================
+  // =========================
+  // MÁSCARA BRL (anti-trava)
+  // =========================
   function moneyMaskBind(el){
     if(!el || el.dataset.moneyBound) return;
     el.dataset.moneyBound='1';
+
+    // força tipo texto para permitir "R$" sem bloquear (evita o bug do type=number)
+    try{ el.type = 'text'; }catch(e){}
     el.classList.add('money');
     el.setAttribute('inputmode','decimal');
     el.setAttribute('autocomplete','off');
 
-    // inicia sempre visível
-    if(!el.value || el.value === '0' || el.value === '0,00') el.value = BRL.format(0);
+    // Se vier vazio, mostra R$ 0,00
+    if(!el.value || /^\s*$/.test(el.value)) el.value = BRL.format(0);
 
-    const digitsOnly = (v)=> (v||'').replace(/\D/g,'');      // só números
-    const fmt = (digits)=>{
+    // Funções auxiliares
+    const digitsOnly = (v)=> (v||'').replace(/\D/g,'');           // pega só números
+    const fmtBRL = (digits)=> {                                   // formata centavos -> BRL
       if(!digits) return BRL.format(0);
       const n = parseInt(digits,10);
       return BRL.format(n/100);
     };
 
-    // mantém BRL o tempo todo
+    // Ao digitar: mantém sempre BRL e cursor vai pro fim (comportamento estável em mobile)
     el.addEventListener('input', () => {
       const d = digitsOnly(el.value);
-      el.value = fmt(d);
+      el.value = fmtBRL(d);
     });
 
+    // Foco: não some e não troca o tipo; apenas garante padrão
     el.addEventListener('focus', () => {
       if(!el.value) el.value = BRL.format(0);
-      // seleciona tudo para facilitar edição no mobile
-      try { setTimeout(()=> el.setSelectionRange(0, el.value.length), 0); } catch(e){}
+      // opcional: não seleciona tudo para não “sumir” em alguns teclados
     });
 
+    // Blur: garante valor válido
     el.addEventListener('blur', () => {
       const d = digitsOnly(el.value);
-      el.value = fmt(d); // nunca fica vazio
+      el.value = fmtBRL(d);
     });
   }
 
   function bindMoneyFields(){
-    ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#translado','#transporte']
+    ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#material','#translado','#transporte']
       .forEach(sel=>{ const el=q(sel); if(el) moneyMaskBind(el); });
   }
-  // =======================
+  // =========================
 
   // Cálculos
   function fatorDia(tipo){ if(tipo==='sabado') return +cfg.mult_sab||1.5; if(tipo==='domingo') return +cfg.mult_dom||2.0; return 1; }
@@ -133,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
-  // Injeta tab Fornecedores se faltar
+  // Injeta Fornecedores (se faltar)
   (function injectSuppliersTab(){
     if(!q('button[data-tab="fornecedores"]')){
       const tabs=q('.tabs'); if(tabs){ const btn=document.createElement('button'); btn.className='btn'; btn.dataset.tab='fornecedores'; btn.textContent='Fornecedores'; tabs.appendChild(btn); }
@@ -224,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cadastro OF
   const formOF=q('#formOF');
   if(formOF){
-    bindMoneyFields(); // garante máscara
+    bindMoneyFields();
     formOF.addEventListener('submit',(e)=>{
       e.preventDefault();
       const id=(q('#ofNumero')?.value||'').trim(); if(!id) return alert('Informe o Nº/ID da OF.');
@@ -247,12 +234,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const of_id=q('#ofId')?.value; if(!of_id) return alert('Selecione uma OF.');
       const data=q('#data')?.value||'';
       const fornecedor=canonicalSupplierName((q('#fornecedor')?.value||'').trim());
-      const materiais=num(q('#materiais')?.value||0);
+
+      const matEl = q('#materiais') || q('#material');
+      const materiais=num(matEl?.value||0);
+
+      const transEl = q('#translado') || q('#transporte');
+      const translado=num(transEl?.value||0);
+
       const profissionais=parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
       const ajudantes=parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
       const almocoInput=num(q('#almoco')?.value||0);
-      const transladoEl = q('#translado') || q('#transporte');
-      const translado=num(transladoEl?.value||0);
       const tipo_dia=(q('#tipoDia')?.value)||'util';
 
       lanc.push({id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia});
@@ -335,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // CSV backup simétrico
+  // CSV
   const CSV_HEAD=['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
   const btnExportar=q('#btnExportar');
   if(btnExportar){
@@ -356,22 +347,18 @@ document.addEventListener('DOMContentLoaded', () => {
       let txt=await file.text(); if(txt.charCodeAt(0)===0xFEFF) txt=txt.slice(1);
       const lines=txt.trim().split(/\r?\n/); if(!lines.length) return;
       const head=splitCsv(lines.shift()); const map=CSV_HEAD.map(h=> head.indexOf(h)); if(map.some(i=> i<0)){ alert('Cabeçalho CSV inválido. Esperado: '+CSV_HEAD.join(',')); return; }
-      const imported=[];
-      lines.forEach(line=>{
-        if(!line.trim()) return; const c=splitCsv(line);
-        imported.push({
-          id:uid(), of_id:c[map[0]].trim(), data:c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
-          materiais:num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
-          ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco:num(c[map[6]]),
-          translado:num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
-        });
-      });
+      const imported=[]; lines.forEach(line=>{ if(!line.trim()) return; const c=splitCsv(line); imported.push({
+        id:uid(), of_id:c[map[0]].trim(), data:c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
+        materiais:num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
+        ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco:num(c[map[6]]),
+        translado:num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
+      }); });
       lanc=imported; ensureSupFromLanc(); persistAll(); alert('Backup restaurado com sucesso!'); renderAll();
     }catch(err){ console.error('Import CSV:', err); alert('Não foi possível importar o CSV.'); }
   }
   function splitCsv(line){ const out=[]; let cur=''; let qd=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(ch==='"'){ if(qd && line[i+1]==='"'){cur+='"'; i++;} else qd=!qd; } else if(ch===',' && !qd){ out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); }
 
-  // Dados filtrados
+  // Filtro + Render
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; const de=q('#fDe')?.value||null; const ate=q('#fAte')?.value||null; const forn=(q('#fFornecedor')?.value||'').toLowerCase().trim();
     return lanc.filter(l=>{
@@ -382,7 +369,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   }
 
-  // Tabela (datas em dd/mm/yyyy)
   function renderTable(rows){
     const tb=q('#tabela tbody'); if(!tb) return; tb.innerHTML='';
     rows.forEach(l=>{
@@ -397,7 +383,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // KPIs
   function renderKpis(rows){
     const mat=sum(rows, r=> +r.materiais||0);
     const mo=sum(rows, r=>{ const f=fatorDia(r.tipo_dia||'util'); return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f; });
@@ -418,7 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Gráficos (datas dd/mm/yyyy nos labels)
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
     const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
@@ -473,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // Seeds (para ambiente novo)
+  // Seeds
   if(ofs.length===0){
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
