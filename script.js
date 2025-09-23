@@ -1,5 +1,5 @@
-// Dashboard Adequações Civis v1.4.6 — HOTFIX MÁSCARA BRL (não-invasiva)
-// Mantém toda a base estável v1.4.6. Corrige entradas monetárias para digitar como "1.234,56".
+// Dashboard Adequações Civis v1.4.6 — COMPAT MÁSCARA BRL
+// Base estável da v1.4.6. Compat: não mascara inputs type=number (evita travar), mascara leve em type=text.
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -20,9 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const qa = (s)=>Array.from(document.querySelectorAll(s));
   const sum = (arr, pick)=> arr.reduce((s,o)=> s + (+pick(o)||0), 0);
 
-  // =========================
-  // FUNÇÕES AUXILIARES
-  // =========================
+  // ===== Auxiliares =====
   const num = (v)=>{ if(v==null) return 0;
     const s=String(v).replace(/\uFEFF/g,'').replace(/R\$\s?/gi,'').replace(/\./g,'').replace(/\s+/g,'').replace(',', '.');
     const n=parseFloat(s); return isNaN(n)?0:n;
@@ -45,9 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const persistOFs =()=>localStorage.setItem(OF_KEY, JSON.stringify(ofs));
   const persistSup =()=>localStorage.setItem(SUP_KEY, JSON.stringify(sups));
 
-  // =========================
-  // HOTFIX MÁSCARA BRL (não mexe em type, não injeta "R$")
-  // =========================
+  // ===== MÁSCARA (compatível) =====
   function brlFormatPlainFromDigits(digs){
     if(!digs) return '0,00';
     if(digs.length === 1) digs = '00' + digs;
@@ -62,6 +58,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function moneyMaskBind(el){
     if(!el || el.dataset.moneyBound) return;
     el.dataset.moneyBound='1';
+    const isNumber = (el.type||'').toLowerCase()==='number';
+
+    if(isNumber){
+      // Não mascara para não travar. Garante step para centavos
+      if(!el.step) el.step = '0.01';
+      el.addEventListener('blur', () => {
+        const n = num(el.value||0);
+        el.title = n ? n.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) : '0,00';
+      });
+      return; // sai — sem máscara em type=number
+    }
+
+    // type=text: máscara leve "1.234,56"
     if(!el.value || /^\s*$/.test(el.value)){
       el.value = '0,00';
     }else{
@@ -82,11 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ['#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco','#materiais','#material','#translado','#transporte']
       .forEach(sel=>{ const el=q(sel); if(el) moneyMaskBind(el); });
   }
-  // =========================
+  // ======================
 
-  // =========================
-  // CÁLCULOS
-  // =========================
+  // ===== Cálculos =====
   function fatorDia(tipo){ if(tipo==='sabado') return +cfg.mult_sab||1.5; if(tipo==='domingo') return +cfg.mult_dom||2.0; return 1; }
   function almocoTotalDe(l){
     const ppl=(+l.profissionais||0)+(+l.ajudantes||0);
@@ -102,9 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0)+mo+almocoTotalDe(l)+(+l.translado||0);
   }
 
-  // =========================
-  // TABS
-  // =========================
+  // ===== Tabs =====
   document.addEventListener('click', (ev)=>{
     const b = ev.target.closest('button[data-tab]'); if(!b) return;
     ev.preventDefault(); qa('.tab').forEach(t=>t.classList.remove('active'));
@@ -146,9 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  // =========================
-  // LANÇAMENTOS UI
-  // =========================
+  // ===== Lançamentos UI =====
   function ensureTipoDiaField(){
     if(q('#tipoDia')) return;
     const container=q('#form')?.querySelector('.row2')||q('#form'); if(!container) return;
@@ -166,9 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dl=q('#fornList'); if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
   }
 
-  // =========================
-  // OFs
-  // =========================
+  // ===== OFs =====
   function renderOFs(){
     const wrap=q('#ofCards'); if(!wrap) return; wrap.innerHTML='';
     const mapG={}; lanc.forEach(l=>{ mapG[l.of_id]=(mapG[l.of_id]||0)+gastoLanc(l); });
@@ -208,12 +209,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if(sel2){ sel2.innerHTML=opts(true); if(!sel2.value) sel2.value='__ALL__'; }
   }
 
-  // =========================
-  // CADASTRO DE OF
-  // =========================
+  // ===== Cadastro OF =====
   const formOF=q('#formOF');
   if(formOF){
-    bindMoneyFields(); // máscara
+    bindMoneyFields(); // garante máscara onde for text e compat onde number
     formOF.addEventListener('submit',(e)=>{
       e.preventDefault();
       const id=(q('#ofNumero')?.value||'').trim(); if(!id) return alert('Informe o Nº/ID da OF.');
@@ -227,9 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // =========================
-  // LANÇAMENTOS (form principal)
-  // =========================
+  // ===== Lançamentos =====
   const form=q('#form');
   if(form){
     bindMoneyFields();
@@ -257,13 +254,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // =========================
-  // CONFIGURAÇÕES
-  // =========================
+  // ===== Config =====
   function ensureConfigUI(forceOpen=false){
     const cont=q('#config'); if(!cont) return;
     let formCfg=cont.querySelector('.form'); if(!formCfg){ formCfg=document.createElement('div'); formCfg.className='form'; cont.appendChild(formCfg); }
-    const addMoney=(id,lbl)=>{ if(q('#'+id)) return; const w=document.createElement('label'); w.className='small'; w.innerHTML=`${lbl}<input type="text" id="${id}" class="money" />`; formCfg.appendChild(w); };
+    const addMoney=(id,lbl)=>{ if(q('#'+id)) return; const w=document.createElement('label'); w.className='small'; w.innerHTML=`${lbl}<input id="${id}" />`; formCfg.appendChild(w); };
     const addNumber=(id,lbl)=>{ if(q('#'+id)) return; const w=document.createElement('label'); w.className='small'; w.innerHTML=`${lbl}<input type="number" id="${id}" step="0.01" min="0" />`; formCfg.appendChild(w); };
     const addSelect=()=>{ if(q('#cfgAlmocoMode')) return; const w=document.createElement('label'); w.className='small'; w.innerHTML=`Almoço interpreta entrada como
       <select id="cfgAlmocoMode">
@@ -273,6 +268,14 @@ document.addEventListener('DOMContentLoaded', () => {
       </select>`; formCfg.appendChild(w); };
     if(!q('#btnSalvarCfg')){ const btns=document.createElement('div'); btns.className='btns'; btns.innerHTML=`<button class="btn primary" id="btnSalvarCfg" type="button">Salvar</button>`; formCfg.appendChild(btns); }
 
+    // Os três de dinheiro podem ser text ou number no seu HTML. Vamos setar corretamente:
+    const setMoneyInput = (id, val)=>{
+      const el = q('#'+id); if(!el) return;
+      const isNumber = (el.type||'').toLowerCase()==='number';
+      if(isNumber){ el.step = el.step || '0.01'; el.value = Number.isFinite(+val) ? (+val).toFixed(2) : '0.00'; }
+      else{ el.value = Number.isFinite(+val) ? (+val).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00'; moneyMaskBind(el); }
+    };
+
     addMoney('cfgProf','R$/profissional (dias úteis)');
     addMoney('cfgAjud','R$/ajudante (dias úteis)');
     addMoney('cfgAlmoco','R$/almoço (por pessoa)');
@@ -280,8 +283,10 @@ document.addEventListener('DOMContentLoaded', () => {
     addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
     addSelect();
 
-    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=Number.isFinite(+v)? (+(+v).toFixed(2)).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00'; moneyMaskBind(el); } };
-    setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
+    setMoneyInput('cfgProf',cfg.prof);
+    setMoneyInput('cfgAjud',cfg.ajud);
+    setMoneyInput('cfgAlmoco',cfg.almoco);
+
     const ms=q('#cfgMultSab'); if(ms) ms.value=cfg.mult_sab??1.5;
     const md=q('#cfgMultDom'); if(md) md.value=cfg.mult_dom??2.0;
     const im=q('#cfgAlmocoMode'); if(im) im.value=cfg.almoco_mode||'por_pessoa';
@@ -307,9 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // =========================
-  // FORNECEDORES (UI)
-  // =========================
+  // ===== Fornecedores =====
   function ensureSupFromLanc(){
     const names = [...new Set(lanc.map(l=> (l.fornecedor||'').trim()).filter(Boolean))];
     names.forEach(n=>{
@@ -374,9 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // =========================
-  // FILTROS
-  // =========================
+  // ===== Filtros =====
   const btnFiltrar=q('#btnFiltrar'); if(btnFiltrar) btnFiltrar.onclick=()=> renderAll();
   const btnLimpar=q('#btnLimpar');
   if(btnLimpar){
@@ -388,9 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // =========================
-  // CSV backup simétrico
-  // =========================
+  // ===== CSV (backup simétrico) =====
   const CSV_HEAD=['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
   const btnExportar=q('#btnExportar');
   if(btnExportar){
@@ -417,10 +416,10 @@ document.addEventListener('DOMContentLoaded', () => {
       lines.forEach(line=>{
         if(!line.trim()) return; const c=splitCsv(line);
         imported.push({
-          id:uid(), of_id:c[map[0]].trim(), data:c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
-          materiais:num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
-          ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco:num(c[map[6]]),
-          translado:num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
+          id:uid(), of_id=c[map[0]].trim(), data=c[map[1]].trim(), fornecedor:canonicalSupplierName(c[map[2]].trim()),
+          materiais=num(c[map[3]]), profissionais:parseInt((c[map[4]]||'').toString().replace(/\D/g,''))||0,
+          ajudantes:parseInt((c[map[5]]||'').toString().replace(/\D/g,''))||0, almoco=num(c[map[6]]),
+          translado=num(c[map[7]]), tipo_dia:(c[map[8]]||'util').trim().toLowerCase()
         });
       });
       lanc=imported; ensureSupFromLanc(); persistAll(); alert('Backup restaurado com sucesso!'); renderAll();
@@ -428,9 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function splitCsv(line){ const out=[]; let cur=''; let qd=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(ch==='"'){ if(qd && line[i+1]==='"'){cur+='"'; i++;} else qd=!qd; } else if(ch===',' && !qd){ out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); }
 
-  // =========================
-  // DADOS FILTRADOS
-  // =========================
+  // ===== Dados filtrados / Tabela / KPIs / Gráficos =====
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; const de=q('#fDe')?.value||null; const ate=q('#fAte')?.value||null; const forn=(q('#fFornecedor')?.value||'').toLowerCase().trim();
     return lanc.filter(l=>{
@@ -441,9 +438,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   }
 
-  // =========================
-  // TABELA
-  // =========================
   function renderTable(rows){
     const tb=q('#tabela tbody'); if(!tb) return; tb.innerHTML='';
     rows.forEach(l=>{
@@ -458,9 +452,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // =========================
-  // KPIs
-  // =========================
   function renderKpis(rows){
     const mat=sum(rows, r=> +r.materiais||0);
     const mo=sum(rows, r=>{ const f=fatorDia(r.tipo_dia||'util'); return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f; });
@@ -481,9 +472,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // =========================
-  // GRÁFICOS
-  // =========================
   let chEvo=null, chCat=null, chForn=null;
   function renderCharts(rows){
     const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
@@ -527,9 +515,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // =========================
-  // RENDER ALL
-  // =========================
   function renderAll(){
     ensureSupFromLanc();
     ensureFornecedorDatalist();
@@ -541,9 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // =========================
-  // SEEDS (somente para ambiente "zerado")
-  // =========================
+  // Seeds (apenas para ambiente zerado)
   if(ofs.length===0){
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
