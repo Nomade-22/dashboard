@@ -130,12 +130,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const dl=q('#fornList'); if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
   }
 
-  // Máscara BRL (focus/blur estável)
+  // === MÁSCARA BRL – compatível com type="number" ===
   function bindMoneyField(el){
-    if(!el || el.dataset.moneyBound) return; el.dataset.moneyBound='1';
-    const toPlain = ()=>{ const v=num(el.value); el.value = v ? String(v).replace('.',',') : ''; };
-    const toBRL   = ()=>{ const v=num(el.value); el.value = v ? BRL.format(v) : ''; };
-    const sanitize = ()=>{ let v=(el.value||'').replace(/[^\d,\.]/g,''); const lc=v.lastIndexOf(','); const ld=v.lastIndexOf('.'); const p=Math.max(lc,ld); if(p>=0){ const int=v.slice(0,p).replace(/[^\d]/g,''); const dec=v.slice(p+1).replace(/[^\d]/g,'').slice(0,2); v=int+(dec?','+dec:''); } else { v=v.replace(/[^\d]/g,''); } el.value=v; };
+    if(!el || el.dataset.moneyBound) return; 
+    el.dataset.moneyBound='1';
+
+    const isNumber = (el.type||'').toLowerCase()==='number';
+
+    // Se for number: NÃO mascara (vírgula/“R$” quebram). Só garante step e mostra prévia no title.
+    if(isNumber){
+      if(!el.step) el.step = '0.01';
+      el.addEventListener('blur', () => {
+        const n = num(el.value||0);
+        el.title = n ? n.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) : '0,00';
+      });
+      return;
+    }
+
+    // type="text": máscara leve (sem "R$")
+    const toPlain = ()=>{ 
+      const v=num(el.value); 
+      el.value = v || v===0 ? String(v).replace('.',',') : ''; 
+    };
+    const toBRL   = ()=>{ 
+      const v=num(el.value); 
+      el.value = v || v===0 ? v.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) : ''; 
+    };
+    const sanitize = ()=>{
+      let v=(el.value||'').replace(/[^\d,\.]/g,'');
+      const lc=v.lastIndexOf(','); const ld=v.lastIndexOf('.');
+      const p=Math.max(lc,ld);
+      if(p>=0){
+        const int=v.slice(0,p).replace(/[^\d]/g,'');
+        const dec=v.slice(p+1).replace(/[^\d]/g,'').slice(0,2);
+        v=int+(dec?','+dec:'');
+      } else {
+        v=v.replace(/[^\d]/g,'');
+        if(v) v = v + ',00'; // ajuda no primeiro foco
+      }
+      el.value=v;
+    };
     el.addEventListener('focus', toPlain);
     el.addEventListener('input', sanitize);
     el.addEventListener('blur', toBRL);
@@ -251,7 +285,16 @@ document.addEventListener('DOMContentLoaded', () => {
     addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)');
     addSelect();
 
-    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=BRL.format(+v||0); bindMoneyField(el); } };
+    const setM=(id,v)=>{ const el=q('#'+id); if(!el) return;
+      const isNumber = (el.type||'').toLowerCase()==='number';
+      if(isNumber){
+        el.step = el.step || '0.01';
+        el.value = Number.isFinite(+v) ? (+v).toFixed(2) : '0.00';
+      } else {
+        el.value = BRL.format(+v||0).replace(/^R\$\s?/, ''); // só valor, sem "R$"
+        bindMoneyField(el);
+      }
+    };
     setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
     const ms=q('#cfgMultSab'); if(ms) ms.value=cfg.mult_sab??1.5;
     const md=q('#cfgMultDom'); if(md) md.value=cfg.mult_dom??2.0;
