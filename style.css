@@ -101,7 +101,7 @@ tr:hover td{background:#121724}
 .sup-item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--panel-2)}
 .sup-item b{font-weight:700}
 
-/* Responsivo (igual ao que você tinha antes) */
+/* Responsivo */
 @media (max-width:980px){
   .kpis{grid-template-columns:1fr 1fr}
   .grid{grid-template-columns:1fr}
@@ -113,8 +113,9 @@ tr:hover td{background:#121724}
   .kpis{grid-template-columns:1fr}
   .title h1{font-size:16px}
   .btn{width:100%}
-  canvas{height:220px !important}
-  .chart-wrap{min-height:220px}
+  /* gráficos mais compactos no celular */
+  canvas{height:160px !important}
+  .chart-wrap{min-height:170px}
   .card{padding:12px}
 }
 
