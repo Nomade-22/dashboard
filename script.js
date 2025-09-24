@@ -1,8 +1,7 @@
-// Dashboard Adequações Civis v2.9
-// Mudanças:
-// - Fornecedor no lançamento usa APENAS cadastros (sem auto-criar a partir dos lançamentos).
-// - Unificação de lançamentos usa somente a lista de fornecedores cadastrados/aliases.
-// - Gráficos mais compactos no mobile (altura + estilos), sem alterar desktop.
+// Dashboard Adequações Civis v3.1
+// Ajuste: Exportação padrão em CSV (mesmo layout da importação).
+// Alt+Clique no botão Exportar => JSON completo (cfg, OFs, fornecedores, lançamentos).
+// Restante do comportamento inalterado (fornecedores só via cadastro, gráficos mobile menores, etc).
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
@@ -42,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if(normalize(s.name)===clean) return s.name; 
       if((s.aliases||[]).some(a=> normalize(a)===clean)) return s.name; 
     }
-    // se não existir nos cadastros, NÃO cria automaticamente:
     return (input||'').trim();
   }
 
@@ -162,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .forEach(sel=>{ const el=q(sel); if(el) moneyMaskBind(el); });
   }
 
-  // ===== Fornecedores (UI — sem auto-criação)
+  // ===== Fornecedores
   function injectSuppliersTab(){
     const tabs=q('.tabs');
     if(tabs && !tabs.querySelector('[data-tab="fornecedores"]')){
@@ -215,9 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     list.querySelectorAll('[data-delsup]').forEach(b=>{
       b.onclick=()=>{ 
         const id=b.dataset.delsup; 
-        const s=sups.find(x=>x.id===id); 
         sups=sups.filter(x=>x.id!==id); persistSup();
-        // NÃO alteramos lançamentos aqui (mantém texto original se deletar fornecedor).
         renderSupUI(); ensureFornecedorDatalist(); renderAll();
       };
     });
@@ -340,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const of_id=q('#ofId')?.value; if(!of_id) return alert('Selecione uma OF.');
       const data=q('#data')?.value||'';
-      const fornecedor=canonicalSupplierName((q('#fornecedor')?.value||'').trim()); // usa SOMENTE cadastros p/ canonizar
+      const fornecedor=canonicalSupplierName((q('#fornecedor')?.value||'').trim());
       const materiais=num(q('#materiais')?.value||0);
       const profissionais=parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
       const ajudantes=parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
@@ -356,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ===== Config (mantém seus campos do index + extras existentes)
+  // ===== Config
   function ensureConfigUI(){
     const cont=q('#config .card .form') || q('#config .form') || q('#config');
     if(!cont) return;
@@ -427,77 +423,48 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ===== Export/Import CSV (simétrico 8 col) + JSON completo
-  const CSV_HEAD_8 = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado'];
-  const CSV_HEAD_9 = [...CSV_HEAD_8, 'tipo_dia']; // leitura compatível
+  // ===== Export/Import
+  // CSV simétrico (9 colunas): of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado,tipo_dia
+  const CSV_HEAD = ['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
 
   function exportCsvLancamentos(filename='adequacoes_civis_lancamentos.csv'){
-    const rows=[CSV_HEAD_8];
+    const rows=[CSV_HEAD];
     lanc.forEach(l=> rows.push([
-      l.of_id, l.data, (l.fornecedor||''), l.materiais, l.profissionais, l.ajudantes, l.almoco, l.translado
+      l.of_id, l.data, (l.fornecedor||''), l.materiais, l.profissionais, l.ajudantes, l.almoco, l.translado, (l.tipo_dia||'util')
     ]));
     const csv=rows.map(r=> r.map(v=>{ const s=(v==null?'':String(v)); return /[",;\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s; }).join(',')).join('\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); 
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   }
   function exportJsonCompleto(filename='adequacoes_civis_backup_full.json'){
-    const full = { version:'2.9', exported_at:new Date().toISOString(), cfg, ofs, fornecedores:sups, lancamentos:lanc };
+    const full = { version:'3.1', exported_at:new Date().toISOString(), cfg, ofs, fornecedores:sups, lancamentos:lanc };
     const blob=new Blob([JSON.stringify(full,null,2)],{type:'application/json;charset=utf-8;'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   }
   const btnExportar=q('#btnExportar');
   if(btnExportar){
-    btnExportar.onclick=(ev)=> ev && ev.altKey ? exportCsvLancamentos() : exportJsonCompleto();
+    // Clique normal => CSV; Alt+Clique => JSON completo (opcional)
+    btnExportar.onclick=(ev)=> (ev && ev.altKey) ? exportJsonCompleto() : exportCsvLancamentos();
   }
-  const inputCSV=q('#inputCSV');
+
+  const inputCSV=q('#inputCSV'); // no index aceita .csv
   if(inputCSV){
     inputCSV.addEventListener('change', async (e)=>{ 
       const file=e.target.files[0]; if(!file) return; 
-      await handleImportFile(file); inputCSV.value=''; 
+      await importFromCsvFile(file); inputCSV.value=''; 
     });
   }
-  async function handleImportFile(file){
+  async function importFromCsvFile(file){
     try{
       const raw = await file.text();
-      // tenta JSON primeiro
-      try{
-        const json = JSON.parse(stripBom(raw));
-        if(json && (json.ofs || json.fornecedores || json.lancamentos || json.cfg)){
-          importFromFullJson(json);
-          alert('Backup completo (JSON) restaurado com sucesso!');
-          renderOFs(); fillOFSelects(true); ensureFornecedorDatalist(); renderAll(); return;
-        }
-      }catch{ /* não é JSON */ }
-      // CSV
       await importFromCsvText(raw);
       alert('CSV de lançamentos importado com sucesso!');
       ensureFornecedorDatalist();
       renderAll();
     }catch(err){
-      console.error('Import:', err);
-      alert('Não foi possível importar o arquivo.');
+      console.error('Import CSV:', err);
+      alert('Não foi possível importar o arquivo CSV.');
     }
-  }
-  function importFromFullJson(json){
-    if(Array.isArray(json.ofs)) ofs = json.ofs.map(x=>({
-      id: String(x.id||'').trim(), cliente: (x.cliente||'').trim(), orcado:+x.orcado||0, desc:(x.desc||'').trim()
-    })).filter(x=>x.id);
-    if(Array.isArray(json.fornecedores)) sups = json.fornecedores.map(s=>({
-      id: s.id || uid(), name:(s.name||'').trim(), aliases:Array.isArray(s.aliases)? s.aliases.filter(Boolean):[]
-    })).filter(s=>s.name);
-    if(Array.isArray(json.lancamentos)) lanc = json.lancamentos.map(l=>({
-      id: l.id || uid(),
-      of_id: (l.of_id||'').trim(),
-      data: (l.data||'').trim(),
-      fornecedor: canonicalSupplierName(l.fornecedor||''), // canoniza somente se existir cadastro
-      materiais: +l.materiais||0,
-      profissionais: parseInt((l.profissionais||0).toString().replace(/\D/g,''))||0,
-      ajudantes: parseInt((l.ajudantes||0).toString().replace(/\D/g,''))||0,
-      almoco: +l.almoco||0,
-      translado: +l.translado||0,
-      tipo_dia: (l.tipo_dia||'util').toLowerCase()
-    })).filter(l=>l.of_id);
-    persistAll();
   }
   async function importFromCsvText(txt){
     let t = stripBom(txt).replace(/\r/g,'');
@@ -505,14 +472,10 @@ document.addEventListener('DOMContentLoaded', () => {
     while(lines.length && !lines[0].trim()) lines.shift();
     const headLine = lines.shift() || '';
     const head = splitCsv(headLine);
-    let map, headerType = 9;
-    if (CSV_HEAD_9.every(h=> head.includes(h))){
-      map = CSV_HEAD_9.map(h=> head.indexOf(h)); headerType = 9;
-    } else if (CSV_HEAD_8.every(h=> head.includes(h))){
-      map = CSV_HEAD_8.map(h=> head.indexOf(h)); headerType = 8;
-    } else {
-      throw new Error('Cabeçalho CSV inválido (8 ou 9 col).');
+    if (!CSV_HEAD.every(h=> head.includes(h))){
+      throw new Error('Cabeçalho CSV inválido (esperado: ' + CSV_HEAD.join(',') + ')');
     }
+    const map = CSV_HEAD.map(h=> head.indexOf(h));
     const imported=[];
     for(const line of lines){
       if(line==='' || !line.trim()) continue;
@@ -527,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ajudantes:parseInt((get(map[5])||'0').toString().replace(/\D/g,''))||0,
         almoco:num(get(map[6])),
         translado:num(get(map[7])),
-        tipo_dia:(headerType===9 ? (get(map[8])||'util') : 'util').trim().toLowerCase()
+        tipo_dia:(get(map[8])||'util').trim().toLowerCase()
       });
     }
     lanc=imported; persistAll();
@@ -545,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return out.map(s=>s.trim());
   }
 
-  // ===== Dados filtrados
+  // ===== Dados filtrados / Tabela / KPIs / Gráficos (iguais à v2.9)
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; 
     const de=q('#fDe')?.value||null; 
@@ -559,7 +522,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   }
 
-  // ===== Tabela
   function renderTable(rows){
     const tb=q('#tabela tbody'); if(!tb) return; tb.innerHTML='';
     rows.forEach(l=>{
@@ -595,7 +557,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ===== KPIs
   function renderKpis(rows){
     const mat=sum(rows, r=> +r.materiais||0);
     const mo=sum(rows, r=>{ const f=fatorDia(r.tipo_dia||'util'); return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f; });
@@ -629,10 +590,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ===== Gráficos (compactação no mobile)
   let chEvo=null, chCat=null, chForn=null;
   function isMobile(){ return window.matchMedia('(max-width: 640px)').matches; }
-
   function mobileTuning(base){
     if(!isMobile()) return base;
     const tuned = JSON.parse(JSON.stringify(base));
@@ -658,7 +617,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     return tuned;
   }
-
   function renderCharts(rows){
     const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
     const dates = Object.keys(byDateRaw).sort();
@@ -693,7 +651,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const cfg2 = mobileTuning({
         type:'doughnut',
         data:{ labels:Object.keys(cat), datasets:[{ data:Object.values(cat) }]},
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:isMobile()?'bottom':'bottom' } } }
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
       });
       chCat = new Chart(e2.getContext('2d'), cfg2);
     }
@@ -709,8 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderAll(){
-    ensureFornecedorDatalist(); // só dos cadastros
-    // NÃO chamamos fillOFSelects aqui (evita resetar seleção)
+    ensureFornecedorDatalist();
     bindMoneyFields();
     const rows=filtrarDados();
     renderKpis(rows);
@@ -723,7 +680,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
   }
-  // NÃO geramos fornecedores a partir de lançamentos; seeds de lançamentos só se vazio.
   if(lanc.length===0){
     lanc=[ {id:uid(), of_id:'6519481', data:'2025-09-19', fornecedor:'Bortolaso', materiais:20600, profissionais:4, ajudantes:2, almoco:0, translado:250, tipo_dia:'util'},
            {id:uid(), of_id:'6519481', data:'2025-09-21', fornecedor:'Bortolaso Ltda', materiais:0, profissionais:4, ajudantes:3, almoco:0, translado:180, tipo_dia:'domingo'} ];
