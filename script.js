@@ -1,10 +1,6 @@
-// Dashboard Adequações Civis v2.6
-// Novidades v2.6:
-// - Backup TOTAL em JSON (ofs, fornecedores, lancamentos, cfg) no mesmo botão Exportar.
-//   * Clique normal: exporta JSON completo.
-//   * Clique com ALT: exporta CSV de lançamentos (compat antigo).
-// - Importação aceita JSON completo OU CSV (8/9 col).
-// Mantido: filtro por OF correto, KPIs Almoço/Translado, máscara BRL, dd/mm/yyyy, translado na OF/KPIs.
+// Dashboard Adequações Civis v2.7
+// Reintroduz: aba Fornecedores (injetada) e campos extras da aba Config (almoco/multiplicadores/modo/PDF).
+// Mantém: filtro por OF correto, KPIs Almoço/Translado, máscara BRL com buffer, import/export JSON/CSV, dd/mm/yyyy.
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
@@ -65,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const persistLanc=()=>localStorage.setItem(KEY, JSON.stringify(lanc));
   const persistCfg =()=>localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
   const persistOFs =()=>localStorage.setItem(OF_KEY, JSON.stringify(ofs));
+  const persistSup =()=>localStorage.setItem(SUP_KEY, JSON.stringify(sups));
 
   // ===== Cálculos
   function fatorDia(tipo){ 
@@ -86,15 +83,20 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0)+mo+almocoTotalDe(l)+(+l.translado||0);
   }
 
+  // ===== Injeções (Fornecedores + ajustes)
+  injectSuppliersTab();  // botão + seção
+  ensureFornecedorDatalist(); // datalist p/ lançamento e filtro dashboard
+
   // ===== Tabs
   document.addEventListener('click', (ev)=>{
     const b = ev.target.closest('button[data-tab]'); if(!b) return;
     ev.preventDefault(); qa('.tab').forEach(t=>t.classList.remove('active'));
     const id=b.dataset.tab, tgt=q('#'+id); if(tgt) tgt.classList.add('active');
     if(id==='dashboard') renderAll();
-    if(id==='lancamentos'){ bindMoneyFields(); fillOFSelects(true); ensureTipoDiaField(); }
+    if(id==='lancamentos'){ bindMoneyFields(); fillOFSelects(true); ensureTipoDiaField(); ensureFornecedorDatalist(); }
     if(id==='ofs'){ renderOFs(); bindMoneyFields(); fillOFSelects(true); }
     if(id==='config'){ ensureConfigUI(); bindMoneyFields(); }
+    if(id==='fornecedores'){ renderSupUI(); }
   });
 
   // Campo Tipo de dia
@@ -164,6 +166,106 @@ document.addEventListener('DOMContentLoaded', () => {
   function bindMoneyFields(){
     ['#materiais','#almoco','#translado','#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco']
       .forEach(sel=>{ const el=q(sel); if(el) moneyMaskBind(el); });
+  }
+
+  // ===== Fornecedores (UI e injeção de aba)
+  function injectSuppliersTab(){
+    // botão na barra de tabs
+    const tabs=q('.tabs');
+    if(tabs && !tabs.querySelector('[data-tab="fornecedores"]')){
+      const btn=document.createElement('button');
+      btn.className='btn'; btn.dataset.tab='fornecedores'; btn.textContent='Fornecedores';
+      tabs.appendChild(btn);
+    }
+    // seção
+    if(!q('#fornecedores')){
+      const sec=document.createElement('section'); sec.id='fornecedores'; sec.className='tab card';
+      sec.innerHTML=`
+        <h2>Cadastro de Fornecedores</h2>
+        <div class="form" style="margin-top:10px">
+          <div class="row2">
+            <label class="small">Nome do fornecedor
+              <input id="supNome" placeholder="Ex.: Bortolaso" />
+            </label>
+            <label class="small">Apelidos (separados por vírgula)
+              <input id="supAliases" placeholder="Ex.: Borto, Bortolaso Ltda" />
+            </label>
+          </div>
+          <div class="btns">
+            <button class="btn primary" id="btnAddSup" type="button">Adicionar</button>
+            <button class="btn" id="btnUnificar" type="button">Unificar lançamentos</button>
+          </div>
+        </div>
+        <div style="margin-top:12px"><div id="supList" class="sup-grid"></div></div>
+        <p class="muted" style="margin-top:10px">“Unificar lançamentos” substitui variações pelo nome cadastrado.</p>
+      `;
+      q('main')?.appendChild(sec);
+    }
+  }
+  function renderSupUI(){
+    ensureSupFromLanc();
+    const list=q('#supList'); if(!list) return; list.innerHTML='';
+    sups.forEach(s=>{
+      const div=document.createElement('div'); div.className='sup-item';
+      div.innerHTML=`<div><b>${s.name}</b><div class="muted" style="font-size:12px">${(s.aliases||[]).join(', ')||'Sem apelidos'}</div></div>
+        <div style="display:flex; gap:8px"><button class="btn" data-editsup="${s.id}" type="button">Editar</button>
+        <button class="btn ghost" data-delsup="${s.id}" type="button">Excluir</button></div>`;
+      list.appendChild(div);
+    });
+    const btnAdd=q('#btnAddSup'), iNome=q('#supNome'), iAliases=q('#supAliases');
+    if(btnAdd) btnAdd.onclick=()=>{ 
+      const name=(iNome?.value||'').trim(); 
+      if(!name) return alert('Informe o nome do fornecedor.'); 
+      const al=(iAliases?.value||'').split(',').map(s=>s.trim()).filter(Boolean); 
+      if(sups.some(x=> normalize(x.name)===normalize(name))) return alert('Fornecedor já cadastrado.'); 
+      sups.push({id:uid(), name, aliases:al}); 
+      persistSup(); iNome.value=''; iAliases.value=''; renderSupUI(); ensureFornecedorDatalist(); 
+    };
+    list.querySelectorAll('[data-delsup]').forEach(b=>{
+      b.onclick=()=>{ 
+        const id=b.dataset.delsup; 
+        const s=sups.find(x=>x.id===id); 
+        sups=sups.filter(x=>x.id!==id); persistSup();
+        if(s){ 
+          const all=[s.name,...(s.aliases||[])].map(x=>normalize(x)); 
+          lanc.forEach(l=>{ if(all.includes(normalize(l.fornecedor||''))) l.fornecedor=''; }); 
+          persistLanc(); 
+        }
+        renderSupUI(); ensureFornecedorDatalist(); renderAll();
+      };
+    });
+    list.querySelectorAll('[data-editsup]').forEach(b=>{
+      b.onclick=()=>{ 
+        const s=sups.find(x=>x.id===b.dataset.editsup); 
+        if(!s) return; 
+        q('#supNome').value=s.name; 
+        q('#supAliases').value=(s.aliases||[]).join(', '); 
+        sups=sups.filter(x=>x.id!==s.id); 
+        persistSup(); 
+        renderSupUI(); 
+        ensureFornecedorDatalist(); 
+      };
+    });
+    const btnUni=q('#btnUnificar');
+    if(btnUni) btnUni.onclick=()=>{ 
+      lanc.forEach(l=>{ l.fornecedor=canonicalSupplierName(l.fornecedor||''); }); 
+      persistLanc(); 
+      alert('Lançamentos unificados pelos fornecedores cadastrados.'); 
+      renderAll(); 
+      renderSupUI(); 
+    };
+  }
+  function ensureFornecedorDatalist(){
+    // Para o campo de fornecedor no Lançamento
+    if(!q('#fornList')){
+      const dl=document.createElement('datalist'); dl.id='fornList'; document.body.appendChild(dl);
+    }
+    const dl=q('#fornList');
+    if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
+    const inp=q('#fornecedor'); if(inp) inp.setAttribute('list','fornList');
+
+    // (Opcional) datalist também no filtro do Dashboard, se quiser
+    const f=q('#fFornecedor'); if(f && !f.getAttribute('list')) f.setAttribute('list','fornList');
   }
 
   // ===== OFs
@@ -243,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const of_id=q('#ofId')?.value; if(!of_id) return alert('Selecione uma OF.');
       const data=q('#data')?.value||'';
-      const fornecedor=(q('#fornecedor')?.value||'').trim();
+      const fornecedor=canonicalSupplierName((q('#fornecedor')?.value||'').trim());
       const materiais=num(q('#materiais')?.value||0);
       const profissionais=parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
       const ajudantes=parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
@@ -258,30 +360,76 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ===== Config
+  // ===== Config (com campos extras + Exportar PDF)
   function ensureConfigUI(){
+    const cont=q('#config .card .form') || q('#config .form') || q('#config');
+    if(!cont) return;
+
+    // adiciona campos que faltam, preservando seu index.html
+    function addMoney(id,lbl){
+      if(q('#'+id)){ moneyMaskBind(q('#'+id)); return; }
+      const w=document.createElement('label'); w.className='small';
+      w.innerHTML=`${lbl}<input id="${id}" class="money" />`;
+      cont.insertBefore(w, cont.querySelector('.btns'));
+      moneyMaskBind(w.querySelector('input'));
+    }
+    function addNumber(id,lbl,ph){
+      if(q('#'+id)) return;
+      const w=document.createElement('label'); w.className='small';
+      w.innerHTML=`${lbl}<input type="number" id="${id}" step="0.01" min="0" placeholder="${ph||''}" />`;
+      cont.insertBefore(w, cont.querySelector('.btns'));
+    }
+    function addAlmocoMode(){
+      if(q('#cfgAlmocoMode')) return;
+      const w=document.createElement('label'); w.className='small';
+      w.innerHTML=`Almoço interpreta entrada como
+        <select id="cfgAlmocoMode">
+          <option value="por_pessoa">Por pessoa (ignora campo de lançamento)</option>
+          <option value="qtd">Quantidade de dias (qtd × pessoas × R$)</option>
+          <option value="valor">Valor total (R$) lançado</option>
+        </select>`;
+      cont.insertBefore(w, cont.querySelector('.btns'));
+    }
+    function addExportPDF(){
+      const tb = q('#config .card .btns') || cont.querySelector('.btns');
+      if(tb && !q('#btnExportPDF')){
+        const b=document.createElement('button'); b.id='btnExportPDF'; b.className='btn'; b.type='button'; b.textContent='Exportar PDF';
+        b.onclick=()=>window.print();
+        tb.appendChild(b);
+      }
+    }
+
+    addMoney('cfgAlmoco','R$/almoço (por pessoa)');
+    addNumber('cfgMultSab','Multiplicador sábado (ex.: 1,5)','1,5');
+    addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)','2,0');
+    addAlmocoMode();
+    addExportPDF();
+
+    // valores atuais
+    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=(+v||0).toFixed(2).replace('.',','); moneyMaskBind(el); } };
+    const setN=(id,v)=>{ const el=q('#'+id); if(el) el.value = (v ?? ''); };
+
+    if(q('#cfgProf')) setM('cfgProf', cfg.prof);
+    if(q('#cfgAjud')) setM('cfgAjud', cfg.ajud);
+    setM('cfgAlmoco', cfg.almoco);
+    setN('cfgMultSab', cfg.mult_sab ?? 1.5);
+    setN('cfgMultDom', cfg.mult_dom ?? 2.0);
+    const mm=q('#cfgAlmocoMode'); if(mm) mm.value = cfg.almoco_mode || 'por_pessoa';
+
     const btn=q('#btnSalvarCfg');
     if(btn && !btn.dataset.bound){
       btn.dataset.bound='1';
       btn.onclick=()=>{ 
-        cfg.prof=num(q('#cfgProf')?.value||0); 
-        cfg.ajud=num(q('#cfgAjud')?.value||0); 
-        const alm = q('#cfgAlmoco'); if(alm) cfg.almoco=num(alm.value||0);
-        const ms  = q('#cfgMultSab'); if(ms) cfg.mult_sab=parseFloat(ms.value||1.5);
-        const md  = q('#cfgMultDom'); if(md) cfg.mult_dom=parseFloat(md.value||2.0);
-        const mm  = q('#cfgAlmocoMode'); if(mm) cfg.almoco_mode=mm.value||'por_pessoa';
+        if(q('#cfgProf')) cfg.prof=num(q('#cfgProf').value||0);
+        if(q('#cfgAjud')) cfg.ajud=num(q('#cfgAjud').value||0);
+        cfg.almoco=num(q('#cfgAlmoco')?.value||0);
+        cfg.mult_sab=parseFloat(q('#cfgMultSab')?.value||1.5);
+        cfg.mult_dom=parseFloat(q('#cfgMultDom')?.value||2.0);
+        cfg.almoco_mode=(q('#cfgAlmocoMode')?.value)||'por_pessoa';
         persistCfg(); alert('Configurações salvas.'); renderAll();
       };
     }
-    const btnReset = q('#btnResetar');
-    if(btnReset && !btnReset.dataset.bound){
-      btnReset.dataset.bound='1';
-      btnReset.onclick=()=>{
-        if(confirm('Apagar TODOS os lançamentos?')){
-          lanc = []; persistLanc(); renderAll();
-        }
-      };
-    }
+    // botão Reset já existe no seu index; mantido.
   }
 
   // ===== Filtros
@@ -310,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function exportJsonCompleto(filename='adequacoes_civis_backup_full.json'){
     const full = {
-      version: '2.6',
+      version: '2.7',
       exported_at: new Date().toISOString(),
       cfg,
       ofs,
@@ -346,20 +494,19 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleImportFile(file){
     try{
       const raw = await file.text();
-      // Tenta JSON completo primeiro
+      // tenta JSON completo primeiro
       try{
         const json = JSON.parse(stripBom(raw));
         if(json && (json.ofs || json.fornecedores || json.lancamentos || json.cfg)){
           importFromFullJson(json);
           alert('Backup completo (JSON) restaurado com sucesso!');
-          renderOFs(); fillOFSelects(true); renderAll(); return;
+          renderOFs(); fillOFSelects(true); ensureFornecedorDatalist(); renderAll(); return;
         }
-        // se não tiver as chaves esperadas, cai para CSV
-      }catch{ /* não é JSON válido, tenta CSV */ }
+      }catch{ /* não é JSON, tenta CSV */ }
 
-      // CSV: compat 8/9 colunas
       await importFromCsvText(raw);
       alert('CSV de lançamentos importado com sucesso!');
+      ensureFornecedorDatalist();
       renderAll();
 
     }catch(err){
@@ -369,7 +516,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function importFromFullJson(json){
-    // validações simples
     if(Array.isArray(json.ofs)) ofs = json.ofs.map(x=>({
       id: String(x.id||'').trim(),
       cliente: (x.cliente||'').trim(),
@@ -433,8 +579,8 @@ document.addEventListener('DOMContentLoaded', () => {
         data:(get(map[1])||'').trim(),
         fornecedor:canonicalSupplierName((get(map[2])||'').trim()),
         materiais:num(get(map[3])),
-        profissionais:parseInt((get(map[4]||'').toString().replace(/\D/g,'')))||0,
-        ajudantes:parseInt((get(map[5]||'').toString().replace(/\D/g,'')))||0,
+        profissionais:parseInt((get(map[4])||'0').toString().replace(/\D/g,''))||0,
+        ajudantes:parseInt((get(map[5])||'0').toString().replace(/\D/g,''))||0,
         almoco:num(get(map[6])),
         translado:num(get(map[7])),
         tipo_dia:(headerType===9 ? (get(map[8])||'util') : 'util').trim().toLowerCase()
@@ -466,7 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return out.map(s=>s.trim());
   }
 
-  // ===== Dados filtrados (OF fix)
+  // ===== Dados filtrados
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; 
     const de=q('#fDe')?.value||null; 
@@ -516,7 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ===== KPIs (injeta Almoço e Translado)
+  // ===== KPIs (Almoço e Translado extras)
   function ensureExtraKpis(){
     const wrap = q('.kpis'); if(!wrap) return;
     if(!q('#kpiAlmocoCard')){
