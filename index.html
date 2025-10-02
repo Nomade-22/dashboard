@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard — Adequações Civis (v3.2 editável + Sheets)</title>
+  <title>Dashboard — Adequações Civis (v3.3)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -13,13 +13,12 @@
 <body>
 <header>
   <div class="title">
-    <h1>Dashboard — Adequações Civis (v3.2)</h1>
+    <h1>Dashboard — Adequações Civis</h1>
   </div>
   <div class="tabs">
     <button class="btn" data-tab="dashboard">Dashboard</button>
     <button class="btn" data-tab="lancamentos">Lançamentos</button>
     <button class="btn" data-tab="ofs">OFs</button>
-    <button class="btn" data-tab="fornecedores">Fornecedores</button>
     <button class="btn ghost" data-tab="config">Configurações</button>
   </div>
 </header>
@@ -33,9 +32,7 @@
       </label>
       <label class="small">De:<input type="date" id="fDe"></label>
       <label class="small">Até:<input type="date" id="fAte"></label>
-      <label class="small">Fornecedor:
-        <input type="text" id="fFornecedor" placeholder="Filtrar fornecedor" list="fornList">
-      </label>
+      <label class="small">Fornecedor:<input type="text" id="fFornecedor" placeholder="Filtrar fornecedor"></label>
       <button class="btn" id="btnFiltrar">Aplicar filtros</button>
       <button class="btn ghost" id="btnLimpar">Limpar</button>
       <span class="pill" id="pillOrcado">Orçado: —</span>
@@ -63,6 +60,17 @@
         <div class="value" id="kpiTotal">R$ 0,00</div>
         <div class="sub" id="kpiRegistros">—</div>
       </div>
+      <!-- KPIs extras -->
+      <div class="card kpi">
+        <div class="label">Somente Almoço</div>
+        <div class="value" id="kpiAlmoco">R$ 0,00</div>
+        <div class="sub" id="kpiAlmocoSub">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Somente Translado</div>
+        <div class="value" id="kpiTranslado">R$ 0,00</div>
+        <div class="sub" id="kpiTransladoSub">—</div>
+      </div>
     </div>
 
     <div class="grid">
@@ -79,8 +87,7 @@
       <div class="card" style="grid-column:1 / -1">
         <div class="toolbar">
           <button class="btn" id="btnExportPDF">Exportar PDF</button>
-          <button class="btn" id="btnSyncSheets" title="Envia tudo para o Sheets">Sincronizar Sheets</button>
-          <button class="btn" id="btnExportar" title="Exporta CSV (Alt+Clique: JSON completo)">Exportar</button>
+          <button class="btn" id="btnExportar">Exportar CSV</button>
           <label class="btn ghost" for="inputCSV">Importar CSV</label>
           <input id="inputCSV" type="file" accept=".csv" style="display:none">
           <span class="muted">CSV: of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado,tipo_dia</span>
@@ -106,23 +113,22 @@
   <section id="lancamentos" class="tab">
     <div class="two-col">
       <div class="card">
-        <h3>Novo Lançamento</h3>
+        <h3 id="formTitle">Novo Lançamento</h3>
         <form id="form" class="form">
+          <input type="hidden" id="editId">
           <label class="small">OF
             <select id="ofId" required></select>
           </label>
           <label class="small">Data<input type="date" id="data" required></label>
-          <label class="small">Fornecedor
-            <input type="text" id="fornecedor" placeholder="Ex.: Bortolaso" list="fornList">
-          </label>
-          <label class="small">Materiais (R$)<input id="materiais" class="money" inputmode="numeric"></label>
+          <label class="small">Fornecedor<input type="text" id="fornecedor" placeholder="Ex.: Bortolaso"></label>
+          <label class="small">Materiais (R$)<input id="materiais" class="money"></label>
           <div class="row2">
             <label class="small">Profissionais (qtd)<input type="number" id="profissionais" step="1" min="0"></label>
             <label class="small">Ajudantes (qtd)<input type="number" id="ajudantes" step="1" min="0"></label>
           </div>
           <div class="row2">
-            <label class="small">Almoço (R$)<input id="almoco" class="money" inputmode="numeric"></label>
-            <label class="small">Translado (R$)<input id="translado" class="money" inputmode="numeric"></label>
+            <label class="small">Almoço (R$)<input id="almoco" class="money"></label>
+            <label class="small">Translado (R$)<input id="translado" class="money"></label>
           </div>
           <div class="row2">
             <label class="small">Tipo de dia
@@ -134,8 +140,8 @@
             </label>
           </div>
           <div class="btns">
-            <button class="btn primary" type="submit">Adicionar</button>
-            <button class="btn ghost" type="reset">Limpar</button>
+            <button class="btn primary" type="submit" id="btnSalvarLanc">Adicionar</button>
+            <button class="btn ghost" type="reset" id="btnCancelarEdit" style="display:none">Cancelar edição</button>
           </div>
         </form>
       </div>
@@ -159,7 +165,7 @@
         <form id="formOF" class="form">
           <label class="small">Nº/ID da OF<input type="text" id="ofNumero" required></label>
           <label class="small">Cliente<input type="text" id="ofCliente"></label>
-          <label class="small">Orçamento (R$)<input id="ofOrcado" class="money" inputmode="numeric"></label>
+          <label class="small">Orçamento (R$)<input id="ofOrcado" class="money"></label>
           <label class="small">Descrição<textarea id="ofDesc"></textarea></label>
           <div class="btns">
             <button class="btn primary" type="submit">Salvar OF</button>
@@ -175,76 +181,63 @@
     </div>
   </section>
 
-  <!-- FORNECEDORES -->
-  <section id="fornecedores" class="tab">
-    <div class="card">
-      <h2>Cadastro de Fornecedores</h2>
-      <div class="form" style="margin-top:10px">
-        <div class="row2">
-          <label class="small">Nome do fornecedor
-            <input id="supNome" placeholder="Ex.: Bortolaso" />
-          </label>
-          <label class="small">Apelidos (separados por vírgula)
-            <input id="supAliases" placeholder="Ex.: Borto, Bortolaso Ltda" />
-          </label>
-        </div>
-        <div class="btns">
-          <button class="btn primary" id="btnAddSup" type="button">Adicionar</button>
-          <button class="btn" id="btnUnificar" type="button">Unificar lançamentos</button>
-        </div>
-      </div>
-      <div style="margin-top:12px"><div id="supList" class="sup-grid"></div></div>
-      <p class="muted" style="margin-top:10px">“Unificar lançamentos” substitui variações pelo nome cadastrado (sem criar novos).</p>
-    </div>
-  </section>
-
   <!-- CONFIG -->
   <section id="config" class="tab">
-    <div class="card" style="max-width:760px">
+    <div class="card" style="max-width:900px">
       <h3>Configurações</h3>
       <div class="form">
         <div class="row2">
-          <label class="small">R$/dia Profissional <input id="cfgProf" class="money" inputmode="numeric"></label>
-          <label class="small">R$/dia Ajudante   <input id="cfgAjud" class="money" inputmode="numeric"></label>
+          <label class="small">R$/dia Profissional
+            <input id="cfgProf" class="money">
+          </label>
+          <label class="small">R$/dia Ajudante
+            <input id="cfgAjud" class="money">
+          </label>
         </div>
         <div class="row2">
-          <label class="small">R$/almoço (por pessoa) <input id="cfgAlmoco" class="money" inputmode="numeric"></label>
+          <label class="small">R$/almoço (por pessoa)
+            <input id="cfgAlmoco" class="money">
+          </label>
           <label class="small">Modo do almoço
             <select id="cfgAlmocoMode">
               <option value="por_pessoa">Por pessoa</option>
-              <option value="qtd">Quantidade de dias × pessoas × R$</option>
-              <option value="valor">Valor total lançado</option>
+              <option value="qtd">Quantidade de dias (qtd × pessoas × R$)</option>
+              <option value="valor">Valor total (R$) lançado</option>
             </select>
           </label>
         </div>
         <div class="row2">
-          <label class="small">Multiplicador sábado (ex.: 1,5) <input type="number" id="cfgMultSab" step="0.01" min="0"></label>
-          <label class="small">Multiplicador domingo/feriado (ex.: 2,0) <input type="number" id="cfgMultDom" step="0.01" min="0"></label>
+          <label class="small">Multiplicador sábado (ex.: 1,5)
+            <input type="number" step="0.01" min="0" id="cfgMultSab">
+          </label>
+          <label class="small">Multiplicador domingo/feriado (ex.: 2,0)
+            <input type="number" step="0.01" min="0" id="cfgMultDom">
+          </label>
         </div>
 
-        <!-- Integração Google Sheets -->
+        <h4 class="muted" style="margin-top:8px">Integração Google Sheets</h4>
         <div class="row2">
           <label class="small">Sheets Web App URL
-            <input type="url" id="cfgSheetsUrl" placeholder="https://script.google.com/macros/s/…/exec">
+            <input id="cfgSheetsUrl" placeholder="https://script.google.com/macros/s/.../exec">
           </label>
           <label class="small">Sheets API Token (opcional)
-            <input type="text" id="cfgSheetsToken" placeholder="X-API-KEY">
+            <input id="cfgSheetsToken" placeholder="se configurado no Apps Script">
           </label>
         </div>
 
         <div class="btns">
-          <button class="btn primary" id="btnSalvarCfg">Salvar</button>
-          <button class="btn" id="btnLoadSheets">Carregar do Sheets</button>
+          <button class="btn primary" id="btnSalvarCfg" type="button">Salvar</button>
+          <button class="btn" id="btnLoadSheets" type="button">Carregar do Sheets</button>
+          <button class="btn" id="btnSyncSheets" type="button">Sincronizar Sheets</button>
+          <button class="btn ghost" id="btnTestSheets" type="button">Testar conexão</button>
         </div>
-        <p class="muted">Cole a URL do Web App (termina com <code>/exec</code>). “Sincronizar Sheets” na Dashboard envia tudo.</p>
+        <p class="muted">Cole a URL do Web App (termina com <code>/exec</code>). “Carregar do Sheets” traz dados para o app. “Sincronizar Sheets” envia tudo.</p>
       </div>
     </div>
   </section>
 </main>
 
-<!-- lista de fornecedores para autocomplete -->
 <datalist id="fornList"></datalist>
-
 <script src="script.js"></script>
 </body>
 </html>
