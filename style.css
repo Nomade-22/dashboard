@@ -126,3 +126,16 @@ tr:hover td{background:#121724}
   .card{box-shadow:none; border:1px solid #ddd}
   table{min-width:0; font-size:12px}
 }
+
+/* --- Modal (edição de lançamentos) --- */
+.modal{display:none}
+.modal.show{display:block}
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter: blur(2px);
+}
+.modal-card{
+  position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(560px, 94vw); background:var(--panel); border:1px solid var(--border);
+  border-radius:16px; padding:16px; box-shadow:0 20px 60px rgba(0,0,0,.45); z-index:60;
+}
+.modal-card h3{ margin:0 0 10px; }
