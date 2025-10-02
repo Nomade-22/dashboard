@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard — Adequações Civis (v1.1 OF)</title>
+  <title>Dashboard — Adequações Civis (v3.2)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -13,13 +13,13 @@
 <body>
 <header>
   <div class="title">
-    <h1>Dashboard — Adequações Civis (v1.1)</h1>
+    <h1>Dashboard — Adequações Civis</h1>
   </div>
   <div class="tabs">
     <button class="btn" data-tab="dashboard">Dashboard</button>
     <button class="btn" data-tab="lancamentos">Lançamentos</button>
     <button class="btn" data-tab="ofs">OFs</button>
-    <button class="btn ghost" data-tab="config">Configurações</button>
+    <button class="btn" data-tab="config">Configurações</button>
   </div>
 </header>
 
@@ -32,7 +32,9 @@
       </label>
       <label class="small">De:<input type="date" id="fDe"></label>
       <label class="small">Até:<input type="date" id="fAte"></label>
-      <label class="small">Fornecedor:<input type="text" id="fFornecedor" placeholder="Filtrar fornecedor"></label>
+      <label class="small">Fornecedor:
+        <input type="text" id="fFornecedor" placeholder="Filtrar fornecedor">
+      </label>
       <button class="btn" id="btnFiltrar">Aplicar filtros</button>
       <button class="btn ghost" id="btnLimpar">Limpar</button>
       <span class="pill" id="pillOrcado">Orçado: —</span>
@@ -60,6 +62,17 @@
         <div class="value" id="kpiTotal">R$ 0,00</div>
         <div class="sub" id="kpiRegistros">—</div>
       </div>
+      <!-- extras -->
+      <div class="card kpi">
+        <div class="label">Somente Almoço</div>
+        <div class="value" id="kpiAlmoco">R$ 0,00</div>
+        <div class="sub" id="kpiAlmocoSub">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Somente Translado</div>
+        <div class="value" id="kpiTranslado">R$ 0,00</div>
+        <div class="sub" id="kpiTransladoSub">—</div>
+      </div>
     </div>
 
     <div class="grid">
@@ -76,9 +89,11 @@
       <div class="card" style="grid-column:1 / -1">
         <div class="toolbar">
           <button class="btn" id="btnExportar">Exportar CSV</button>
+          <button class="btn" id="btnSyncSheets">Sincronizar Sheets</button>
+          <button class="btn" id="btnLoadSheets">Carregar do Sheets</button>
           <label class="btn ghost" for="inputCSV">Importar CSV</label>
           <input id="inputCSV" type="file" accept=".csv" style="display:none">
-          <button class="btn ghost" id="btnSyncSheets">Sincronizar Sheets</button>
+          <button class="btn" id="btnExportPDF">Exportar PDF</button>
           <span class="muted">CSV: of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado,tipo_dia</span>
         </div>
         <div class="table-wrap">
@@ -108,15 +123,27 @@
             <select id="ofId" required></select>
           </label>
           <label class="small">Data<input type="date" id="data" required></label>
-          <label class="small">Fornecedor<input type="text" id="fornecedor" placeholder="Ex.: Bortolaso"></label>
-          <label class="small">Materiais (R$)<input type="number" id="materiais" step="0.01" min="0"></label>
+          <label class="small">Fornecedor
+            <input type="text" id="fornecedor" placeholder="Ex.: Bortolaso">
+          </label>
+          <label class="small">Materiais (R$)
+            <input id="materiais" />
+          </label>
           <div class="row2">
-            <label class="small">Profissionais (qtd)<input type="number" id="profissionais" step="1" min="0"></label>
-            <label class="small">Ajudantes (qtd)<input type="number" id="ajudantes" step="1" min="0"></label>
+            <label class="small">Profissionais (qtd)
+              <input type="number" id="profissionais" step="1" min="0">
+            </label>
+            <label class="small">Ajudantes (qtd)
+              <input type="number" id="ajudantes" step="1" min="0">
+            </label>
           </div>
           <div class="row2">
-            <label class="small">Almoço (R$)<input type="number" id="almoco" step="0.01" min="0"></label>
-            <label class="small">Translado (R$)<input type="number" id="translado" step="0.01" min="0"></label>
+            <label class="small">Almoço (R$)
+              <input id="almoco" />
+            </label>
+            <label class="small">Translado (R$)
+              <input id="translado" />
+            </label>
           </div>
           <div class="btns">
             <button class="btn primary" type="submit">Adicionar</button>
@@ -144,7 +171,7 @@
         <form id="formOF" class="form">
           <label class="small">Nº/ID da OF<input type="text" id="ofNumero" required></label>
           <label class="small">Cliente<input type="text" id="ofCliente"></label>
-          <label class="small">Orçamento (R$)<input type="number" id="ofOrcado" step="0.01" min="0"></label>
+          <label class="small">Orçamento (R$)<input id="ofOrcado"></label>
           <label class="small">Descrição<textarea id="ofDesc"></textarea></label>
           <div class="btns">
             <button class="btn primary" type="submit">Salvar OF</button>
@@ -162,85 +189,52 @@
 
   <!-- CONFIG -->
   <section id="config" class="tab">
-    <div class="card" style="max-width:520px">
+    <div class="card" style="max-width:720px">
       <h3>Configurações</h3>
       <div class="form">
         <label class="small">R$/dia Profissional
-          <input type="number" id="cfgProf" step="0.01" min="0">
+          <input id="cfgProf">
         </label>
         <label class="small">R$/dia Ajudante
-          <input type="number" id="cfgAjud" step="0.01" min="0">
+          <input id="cfgAjud">
+        </label>
+        <label class="small">R$/almoço (por pessoa)
+          <input id="cfgAlmoco">
+        </label>
+        <label class="small">Multiplicador sábado (ex.: 1,5)
+          <input type="number" id="cfgMultSab" step="0.01" min="0">
+        </label>
+        <label class="small">Multiplicador domingo/feriado (ex.: 2,0)
+          <input type="number" id="cfgMultDom" step="0.01" min="0">
+        </label>
+        <label class="small">Almoço interpreta entrada como
+          <select id="cfgAlmocoMode">
+            <option value="por_pessoa">Por pessoa (ignora campo no lançamento)</option>
+            <option value="qtd">Quantidade de dias (qtd × pessoas × R$)</option>
+            <option value="valor">Valor total (R$) lançado</option>
+          </select>
         </label>
 
-        <!-- NOVO: Config Google Sheets -->
+        <hr style="border-color:var(--border)">
+        <h4>Google Sheets (Web App)</h4>
         <label class="small">Sheets Web App URL
-          <input type="url" id="cfgSheetsUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+          <input id="cfgSheetsUrl" placeholder="https://script.google.com/macros/s/.../exec">
         </label>
         <label class="small">Sheets API Token (opcional)
-          <input type="text" id="cfgSheetsToken" placeholder="ex.: MEU_TOKEN_SECRETO">
+          <input id="cfgSheetsToken" placeholder="X-API-KEY">
         </label>
 
         <div class="btns">
-          <button class="btn primary" id="btnSalvarCfg">Salvar</button>
-          <button class="btn" id="btnResetar">Resetar dados (lançamentos)</button>
+          <button class="btn primary" id="btnSalvarCfg" type="button">Salvar</button>
         </div>
-        <p class="muted">Padrão: Prof R$ 809,00 | Ajud R$ 405,00</p>
+        <p class="muted">Padrão: Prof R$ 809,00 | Ajud R$ 405,00 | Almoço R$ 45,00</p>
       </div>
     </div>
   </section>
 </main>
 
-<!-- MODAL DE EDIÇÃO -->
-<div class="modal" id="editModal" aria-hidden="true">
-  <div class="modal-backdrop" data-close="editModal"></div>
-  <div class="modal-card">
-    <h3>Editar Lançamento</h3>
-    <form id="formEdit" class="form">
-      <input type="hidden" id="editId">
-      <label class="small">OF
-        <select id="editOfId" required></select>
-      </label>
-      <label class="small">Data
-        <input type="date" id="editData" required>
-      </label>
-      <label class="small">Fornecedor
-        <input type="text" id="editFornecedor" list="fornList">
-      </label>
-      <div class="row2">
-        <label class="small">Materiais (R$)
-          <input id="editMateriais">
-        </label>
-        <label class="small">Translado (R$)
-          <input id="editTranslado">
-        </label>
-      </div>
-      <div class="row2">
-        <label class="small">Profissionais (qtd)
-          <input type="number" id="editProfissionais" min="0" step="1">
-        </label>
-        <label class="small">Ajudantes (qtd)
-          <input type="number" id="editAjudantes" min="0" step="1">
-        </label>
-      </div>
-      <div class="row2">
-        <label class="small">Almoço (R$ ou qtd)
-          <input id="editAlmoco">
-        </label>
-        <label class="small">Tipo de Dia
-          <select id="editTipoDia">
-            <option value="util">Dia útil</option>
-            <option value="sabado">Sábado (+50%)</option>
-            <option value="domingo">Domingo/Feriado (+100%)</option>
-          </select>
-        </label>
-      </div>
-      <div class="btns">
-        <button class="btn primary" type="submit">Salvar</button>
-        <button class="btn ghost" data-close="editModal" type="button">Cancelar</button>
-      </div>
-    </form>
-  </div>
-</div>
+<!-- datalist de fornecedores -->
+<datalist id="fornList"></datalist>
 
 <script src="script.js"></script>
 </body>
