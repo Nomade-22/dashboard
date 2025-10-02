@@ -1,9 +1,7 @@
-// Dashboard Adequações Civis v3.2
-// + Edição de lançamentos (modal).
-// + Integração opcional via Google Apps Script Web App (Sheets).
-//   - Botão "Sincronizar Sheets" na Dashboard toolbar
-//   - Config em "Configurações": URL do Web App + Token
-//   - Endpoints: ver Code.gs no final desta resposta.
+// Dashboard Adequações Civis v3.1 + Sheets hook
+// - Mantém máscara BRL com buffer
+// - Adiciona campos de Sheets (URL/Token) e botões de Sync/Load
+// - Export CSV simétrico; Alt+Export => JSON completo
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
@@ -17,10 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
     prof: 809, ajud: 405, almoco: 45, almoco_mode: 'por_pessoa', mult_sab: 1.5, mult_dom: 2.0,
     sheets_url: '', sheets_token: ''
   }));
-  // garante campos novos
-  cfg.sheets_url  = cfg.sheets_url  || '';
-  cfg.sheets_token= cfg.sheets_token|| '';
-
   let lanc = JSON.parse(localStorage.getItem(KEY) || '[]');
   let ofs  = JSON.parse(localStorage.getItem(OF_KEY)  || '[]');
   let sups = JSON.parse(localStorage.getItem(SUP_KEY) || '[]');
@@ -40,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
     return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
   };
-
   const normalize = (s)=> (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
   function canonicalSupplierName(input){
     const clean = normalize(input); if(!clean) return (input||'').trim();
@@ -62,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const persistOFs =()=>localStorage.setItem(OF_KEY, JSON.stringify(ofs));
   const persistSup =()=>localStorage.setItem(SUP_KEY, JSON.stringify(sups));
 
-  // ===== Cálculos
+  // ====== cálculos
   function fatorDia(tipo){ 
     if(tipo==='sabado') return +cfg.mult_sab||1.5; 
     if(tipo==='domingo') return +cfg.mult_dom||2.0; 
@@ -82,27 +75,30 @@ document.addEventListener('DOMContentLoaded', () => {
     return (+l.materiais||0)+mo+almocoTotalDe(l)+(+l.translado||0);
   }
 
-  // ===== Injeções
-  injectSuppliersTab();     
-  ensureFornecedorDatalist(); // inicial
-  ensurePdfButtonOnDashboard();
-
   // ===== Tabs
   document.addEventListener('click', (ev)=>{
     const b = ev.target.closest('button[data-tab]'); if(!b) return;
     ev.preventDefault(); qa('.tab').forEach(t=>t.classList.remove('active'));
     const id=b.dataset.tab, tgt=q('#'+id); if(tgt) tgt.classList.add('active');
-    if(id==='dashboard') { ensurePdfButtonOnDashboard(); renderAll(); }
-    if(id==='lancamentos'){ bindMoneyFields(); fillOFSelects(true); ensureTipoDiaField(); ensureFornecedorDatalist(); }
-    if(id==='ofs'){ renderOFs(); bindMoneyFields(); fillOFSelects(true); }
+    if(id==='dashboard') { renderAll(); }
+    if(id==='lancamentos'){ ensureTipoDiaField(); ensureFornecedorDatalist(); fillOFSelects(true); bindMoneyFields(); }
+    if(id==='ofs'){ renderOFs(); fillOFSelects(true); bindMoneyFields(); }
     if(id==='config'){ ensureConfigUI(); bindMoneyFields(); }
     if(id==='fornecedores'){ renderSupUI(); }
   });
 
+  // ===== Fornecedor datalist
+  function ensureFornecedorDatalist(){
+    const dl=q('#fornList'); if(!dl) return;
+    dl.innerHTML = sups.map(s=>`<option value="${s.name}">`).join('');
+    const inpLanc=q('#fornecedor'); if(inpLanc) inpLanc.setAttribute('list','fornList');
+    const inpFiltro=q('#fFornecedor'); if(inpFiltro) inpFiltro.setAttribute('list','fornList');
+  }
+
+  // ===== Tipo de dia no formulário de lançamento
   function ensureTipoDiaField(){
     if(q('#tipoDia')) return;
-    const form = q('#form');
-    if(!form) return;
+    const form = q('#form'); if(!form) return;
     const wrap = document.createElement('label');
     wrap.className='small';
     wrap.innerHTML = `Tipo de dia
@@ -114,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     form.appendChild(wrap);
   }
 
-  // ===== Máscara BRL com buffer
+  // ===== máscara BRL (buffer de dígitos)
   function forceTextInput(el){
     if(!el) return el;
     if((el.type||'').toLowerCase() === 'text') return el;
@@ -163,114 +159,13 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('blur', ()=> el.value = brlFormatFromDigits(digs));
   }
   function bindMoneyFields(){
-    ['#materiais','#almoco','#translado','#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco',
-     '#editMateriais','#editTranslado','#editAlmoco'
-    ].forEach(sel=>{ const el=q(sel); if(el) moneyMaskBind(el); });
-  }
-
-  // ===== Fornecedores
-  function injectSuppliersTab(){
-    const tabs=q('.tabs');
-    if(tabs && !tabs.querySelector('[data-tab="fornecedores"]')){
-      const btn=document.createElement('button');
-      btn.className='btn'; btn.dataset.tab='fornecedores'; btn.textContent='Fornecedores';
-      tabs.appendChild(btn);
-    }
-    if(!q('#fornecedores')){
-      const sec=document.createElement('section'); sec.id='fornecedores'; sec.className='tab card';
-      sec.innerHTML=`
-        <h2>Cadastro de Fornecedores</h2>
-        <div class="form" style="margin-top:10px">
-          <div class="row2">
-            <label class="small">Nome do fornecedor
-              <input id="supNome" placeholder="Ex.: Bortolaso" />
-            </label>
-            <label class="small">Apelidos (separados por vírgula)
-              <input id="supAliases" placeholder="Ex.: Borto, Bortolaso Ltda" />
-            </label>
-          </div>
-          <div class="btns">
-            <button class="btn primary" id="btnAddSup" type="button">Adicionar</button>
-            <button class="btn" id="btnUnificar" type="button">Unificar lançamentos</button>
-          </div>
-        </div>
-        <div style="margin-top:12px"><div id="supList" class="sup-grid"></div></div>
-        <p class="muted" style="margin-top:10px">“Unificar lançamentos” substitui variações pelo nome cadastrado (sem criar novos).</p>
-      `;
-      q('main')?.appendChild(sec);
-    }
-  }
-  function renderSupUI(){
-    const list=q('#supList'); if(!list) return; list.innerHTML='';
-    sups.forEach(s=>{
-      const div=document.createElement('div'); div.className='sup-item';
-      div.innerHTML=`<div><b>${s.name}</b><div class="muted" style="font-size:12px">${(s.aliases||[]).join(', ')||'Sem apelidos'}</div></div>
-        <div style="display:flex; gap:8px"><button class="btn" data-editsup="${s.id}" type="button">Editar</button>
-        <button class="btn ghost" data-delsup="${s.id}" type="button">Excluir</button></div>`;
-      list.appendChild(div);
-    });
-    const btnAdd=q('#btnAddSup'), iNome=q('#supNome'), iAliases=q('#supAliases');
-    if(btnAdd) btnAdd.onclick=()=>{ 
-      const name=(iNome?.value||'').trim(); 
-      if(!name) return alert('Informe o nome do fornecedor.'); 
-      const al=(iAliases?.value||'').split(',').map(s=>s.trim()).filter(Boolean); 
-      if(sups.some(x=> normalize(x.name)===normalize(name))) return alert('Fornecedor já cadastrado.'); 
-      sups.push({id:uid(), name, aliases:al}); 
-      persistSup(); iNome.value=''; iAliases.value=''; renderSupUI(); ensureFornecedorDatalist(); 
-    };
-    list.querySelectorAll('[data-delsup]').forEach(b=>{
-      b.onclick=()=>{ 
-        const id=b.dataset.delsup; 
-        sups=sups.filter(x=>x.id!==id); persistSup();
-        renderSupUI(); ensureFornecedorDatalist(); renderAll();
-      };
-    });
-    list.querySelectorAll('[data-editsup]').forEach(b=>{
-      b.onclick=()=>{ 
-        const s=sups.find(x=>x.id===b.dataset.editsup); 
-        if(!s) return; 
-        q('#supNome').value=s.name; 
-        q('#supAliases').value=(s.aliases||[]).join(', '); 
-        sups=sups.filter(x=>x.id!==s.id); 
-        persistSup(); 
-        renderSupUI(); 
-        ensureFornecedorDatalist(); 
-      };
-    });
-    const btnUni=q('#btnUnificar');
-    if(btnUni) btnUni.onclick=()=>{ 
-      lanc.forEach(l=>{ l.fornecedor=canonicalSupplierName(l.fornecedor||''); }); 
-      persistLanc(); 
-      alert('Lançamentos unificados com base nos fornecedores cadastrados.'); 
-      renderAll(); 
-      renderSupUI(); 
-    };
-  }
-  function ensureFornecedorDatalist(){
-    if(!q('#fornList')){
-      const dl=document.createElement('datalist'); dl.id='fornList'; document.body.appendChild(dl);
-    }
-    const dl=q('#fornList');
-    if(dl) dl.innerHTML=sups.map(s=>`<option value="${s.name}">`).join('');
-    const inpLanc=q('#fornecedor'); if(inpLanc) inpLanc.setAttribute('list','fornList');
-    const inpFiltro=q('#fFornecedor'); if(inpFiltro && !inpFiltro.getAttribute('list')) inpFiltro.setAttribute('list','fornList');
-    const inpEdit=q('#editFornecedor'); if(inpEdit) inpEdit.setAttribute('list','fornList');
-  }
-
-  // ===== Botão PDF na Dashboard
-  function ensurePdfButtonOnDashboard(){
-    const toolbar = q('#dashboard .toolbar');
-    if(toolbar && !q('#btnExportPDF')){
-      const b=document.createElement('button'); 
-      b.id='btnExportPDF'; b.className='btn'; b.type='button'; b.textContent='Exportar PDF';
-      b.onclick=()=>window.print();
-      toolbar.insertBefore(b, toolbar.firstChild);
-    }
+    ['#materiais','#almoco','#translado','#ofOrcado','#cfgProf','#cfgAjud','#cfgAlmoco']
+      .forEach(sel=>{ const el=q(sel); if(el) moneyMaskBind(el); });
   }
 
   // ===== OFs
   function fillOFSelects(preserve=true){
-    const sel1=q('#ofId'), sel2=q('#selOF'), sel3=q('#editOfId'); 
+    const sel1=q('#ofId'), sel2=q('#selOF'); 
     const buildOpts=(all)=>{ 
       let h=all?`<option value="__ALL__">— Todas OFs —</option>`:''; 
       ofs.forEach(of=> h+=`<option value="${of.id}">${of.id} — ${of.cliente||''}</option>`); 
@@ -286,11 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
       sel2.innerHTML = buildOpts(true);
       if(preserve && cur && [...sel2.options].some(o=>o.value===cur)) sel2.value=cur;
       else if(!sel2.value) sel2.value='__ALL__';
-    }
-    if(sel3){
-      const cur = preserve ? sel3.value : '';
-      sel3.innerHTML = buildOpts(false);
-      if(preserve && cur && [...sel3.options].some(o=>o.value===cur)) sel3.value=cur;
     }
   }
   function renderOFs(){
@@ -336,13 +226,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const cliente=(q('#ofCliente')?.value||'').trim();
       const orcado=num(q('#ofOrcado')?.value||0);
       const desc=(q('#ofDesc')?.value||'').trim();
-      ofs.push({id,cliente,orcado,desc}); persistOFs();
+      const novo={id,cliente,orcado,desc};
+      ofs.push(novo); persistOFs();
+      // opcional: sheetsUpsert('ofs', novo);
       formOF.reset(); renderOFs(); fillOFSelects(true);
       alert('OF cadastrada.');
     });
   }
 
-  // ===== Lançamentos (criação)
+  // ===== Lançamentos
   const form=q('#form');
   if(form){
     bindMoneyFields();
@@ -358,57 +250,46 @@ document.addEventListener('DOMContentLoaded', () => {
       const translado=num((q('#translado')?.value)||0);
       const tipo_dia=(q('#tipoDia')?.value)||'util';
 
-      const newLanc = {id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia};
-      lanc.push(newLanc);
-      persistAll(); form.reset();
+      const novo={id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia};
+      lanc.push(novo); persistAll();
+      // opcional: sheetsUpsert('lancamentos', novo);
+      form.reset();
       const td=q('#tipoDia'); if(td) td.value=tipo_dia;
       ensureFornecedorDatalist(); 
-      // opcional: enviar ao Sheets em criação
-      sheetsUpsert('lancamentos', newLanc).catch(()=>{});
       alert('Lançamento adicionado.'); renderAll();
     });
   }
 
-  // ===== EDITAR Lançamentos (modal)
-  function openModal(id){
-    const m = q('#editModal'); if(!m) return;
-    m.classList.add('show'); m.setAttribute('aria-hidden','false');
-  }
-  function closeModal(){
-    const m = q('#editModal'); if(!m) return;
-    m.classList.remove('show'); m.setAttribute('aria-hidden','true');
-  }
-  document.addEventListener('click', (e)=>{
-    const tgt = e.target.closest('[data-close="editModal"]');
-    if(tgt){ e.preventDefault(); closeModal(); }
-  });
+  // ===== Config
+  function ensureConfigUI(){
+    // preencher campos se existirem
+    const setMoney=(id,v)=>{ const el=q('#'+id); if(el){ el.value=(+v||0).toFixed(2).replace('.',','); moneyMaskBind(el);} };
+    const setVal=(id,v)=>{ const el=q('#'+id); if(el) el.value = v ?? ''; };
 
-  const formEdit = q('#formEdit');
-  if(formEdit){
-    formEdit.addEventListener('submit', (e)=>{
-      e.preventDefault();
-      const id = q('#editId').value;
-      const idx = lanc.findIndex(x=>x.id===id);
-      if(idx<0) return closeModal();
+    setMoney('cfgProf', cfg.prof);
+    setMoney('cfgAjud', cfg.ajud);
+    setMoney('cfgAlmoco', cfg.almoco);
+    setVal('cfgSheetsUrl', cfg.sheets_url||'');
+    setVal('cfgSheetsToken', cfg.sheets_token||'');
 
-      const updated = {
-        ...lanc[idx],
-        of_id: q('#editOfId').value || lanc[idx].of_id,
-        data: q('#editData').value || '',
-        fornecedor: canonicalSupplierName((q('#editFornecedor').value||'').trim()),
-        materiais: num(q('#editMateriais').value||0),
-        translado: num(q('#editTranslado').value||0),
-        profissionais: parseInt((q('#editProfissionais').value||'').toString().replace(/\D/g,''))||0,
-        ajudantes: parseInt((q('#editAjudantes').value||'').toString().replace(/\D/g,''))||0,
-        almoco: num(q('#editAlmoco').value||0),
-        tipo_dia: (q('#editTipoDia').value)||'util'
+    const btn=q('#btnSalvarCfg');
+    if(btn && !btn.dataset.bound){
+      btn.dataset.bound='1';
+      btn.onclick=()=>{
+        cfg.prof=num(q('#cfgProf')?.value||0);
+        cfg.ajud=num(q('#cfgAjud')?.value||0);
+        cfg.almoco=num(q('#cfgAlmoco')?.value||0);
+        cfg.sheets_url=(q('#cfgSheetsUrl')?.value||'').trim();
+        cfg.sheets_token=(q('#cfgSheetsToken')?.value||'').trim();
+        persistCfg(); alert('Configurações salvas.');
       };
-      lanc[idx] = updated;
-      persistLanc();
-      // opcional: sincronizar update no Sheets
-      sheetsUpsert('lancamentos', updated).catch(()=>{});
-      closeModal(); renderAll();
-    });
+    }
+
+    const btnLoad=q('#btnLoadSheets');
+    if(btnLoad && !btnLoad.dataset.bound){
+      btnLoad.dataset.bound='1';
+      btnLoad.onclick=()=>loadAllFromSheets();
+    }
   }
 
   // ===== Filtros
@@ -428,23 +309,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function exportCsvLancamentos(filename='adequacoes_civis_lancamentos.csv'){
     const rows=[CSV_HEAD];
-    lanc.forEach(l=> rows.push([
-      l.of_id, l.data, (l.fornecedor||''), l.materiais, l.profissionais, l.ajudantes, l.almoco, l.translado, (l.tipo_dia||'util')
-    ]));
+    lanc.forEach(l=> rows.push([l.of_id,l.data,(l.fornecedor||''),l.materiais,l.profissionais,l.ajudantes,l.almoco,l.translado,(l.tipo_dia||'util')]));
     const csv=rows.map(r=> r.map(v=>{ const s=(v==null?'':String(v)); return /[",;\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s; }).join(',')).join('\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); 
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   }
   function exportJsonCompleto(filename='adequacoes_civis_backup_full.json'){
-    const full = { version:'3.2', exported_at:new Date().toISOString(), cfg, ofs, fornecedores:sups, lancamentos:lanc };
-    const blob=new Blob([JSON.stringify(full,null,2)],{type:'application/json;charset=utf-8;'});
+    const full = { version:'3.1', exported_at:new Date().toISOString(), cfg, ofs, fornecedores:sups, lancamentos:lanc };
+    const blob=new Blob([JSON.stringify(full,null,2)],{type:'application/json;charset=utf-8;'}); 
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   }
   const btnExportar=q('#btnExportar');
   if(btnExportar){
     btnExportar.onclick=(ev)=> (ev && ev.altKey) ? exportJsonCompleto() : exportCsvLancamentos();
   }
-
   const inputCSV=q('#inputCSV');
   if(inputCSV){
     inputCSV.addEventListener('change', async (e)=>{ 
@@ -506,7 +384,63 @@ document.addEventListener('DOMContentLoaded', () => {
     return out.map(s=>s.trim());
   }
 
-  // ===== Dados + Tabela + KPIs + Gráficos
+  // ===== Sheets (conexão)
+  function hasSheets(){ return !!(cfg.sheets_url && cfg.sheets_url.startsWith('http')); }
+  function sheetsHeaders(){
+    const h={'Content-Type':'application/json'};
+    if(cfg.sheets_token) h['X-API-KEY']=cfg.sheets_token;
+    return h;
+  }
+  async function sheetsSyncAll(){
+    if(!hasSheets()) return alert('Defina a URL do Web App nas Configurações.');
+    try{
+      const full = { cfg, ofs, fornecedores: sups, lancamentos: lanc };
+      const resp = await fetch(cfg.sheets_url, {
+        method:'POST', headers: sheetsHeaders(),
+        body: JSON.stringify({ action:'sync_all', data: full })
+      });
+      const json = await resp.json().catch(()=> ({}));
+      alert(json.ok ? 'Sincronizado com Sheets!' : 'Sheets respondeu sem ok=true');
+    }catch(e){ console.error(e); alert('Falha ao sincronizar com Sheets.'); }
+  }
+  async function loadAllFromSheets(){
+    if(!hasSheets()) return alert('Defina a URL do Web App nas Configurações.');
+    try{
+      async function pull(kind){
+        const r = await fetch(`${cfg.sheets_url}?kind=${kind}`);
+        const j = await r.json(); return j.ok ? j.rows : [];
+      }
+      const cfgRows = await pull('config');
+      if(cfgRows[0]) Object.assign(cfg, cfgRows[0]);
+
+      ofs  = await pull('ofs');
+      sups = await pull('fornecedores');
+      lanc = await pull('lancamentos');
+
+      persistAll(); renderOFs(); fillOFSelects(true); ensureFornecedorDatalist(); renderAll();
+      alert('Dados carregados do Sheets!');
+    }catch(e){ console.error(e); alert('Falha ao carregar do Sheets.'); }
+  }
+  const btnSync=q('#btnSyncSheets'); if(btnSync) btnSync.onclick=(ev)=> sheetsSyncAll(ev);
+  // botão "Carregar do Sheets" está ligado no ensureConfigUI()
+
+  // (ganchos futuros para edição por registro)
+  async function sheetsUpsert(kind, data){
+    if(!hasSheets()) return;
+    try{
+      await fetch(cfg.sheets_url, { method:'POST', headers:sheetsHeaders(),
+        body: JSON.stringify({ action:'upsert', kind, data }) });
+    }catch{}
+  }
+  async function sheetsDelete(kind, obj){
+    if(!hasSheets()) return;
+    try{
+      await fetch(cfg.sheets_url, { method:'POST', headers:sheetsHeaders(),
+        body: JSON.stringify({ action:'delete', kind, id: obj.id }) });
+    }catch{}
+  }
+
+  // ===== Filtragem / Tabela / KPIs / Gráficos
   function filtrarDados(){
     const sel=q('#selOF')?.value||'__ALL__'; 
     const de=q('#fDe')?.value||null; 
@@ -525,11 +459,10 @@ document.addEventListener('DOMContentLoaded', () => {
     rows.forEach(l=>{
       const total=gastoLanc(l), ppl=(+l.profissionais||0)+(+l.ajudantes||0), mode=cfg.almoco_mode||'por_pessoa', almTotal=almocoTotalDe(l);
       const almInfo=(mode==='valor')
-        ? `${BRL.format(almocoTotalDe(l))}`
+        ? `${BRL.format(almTotal)}`
         : (mode==='qtd')
           ? `${l.almoco||0} × ${ppl} × ${BRL.format(+cfg.almoco||0)} = ${BRL.format(almTotal)}`
           : `${ppl} × ${BRL.format(+cfg.almoco||0)} = ${BRL.format(almTotal)}`;
-
       const tr=document.createElement('tr');
       tr.innerHTML=
         `<td>${l.of_id||''}</td>
@@ -541,46 +474,18 @@ document.addEventListener('DOMContentLoaded', () => {
          <td>${almInfo}</td>
          <td>${BRL.format(l.translado||0)}</td>
          <td><b>${BRL.format(total)}</b></td>
-         <td>
-           <button class="btn" data-editid="${l.id||''}" type="button">Editar</button>
-           <button class="btn ghost" data-delid="${l.id||''}" type="button">Excluir</button>
-         </td>`;
+         <td><button class="btn ghost" data-delid="${l.id||''}" type="button">Excluir</button></td>`;
       tb.appendChild(tr);
     });
-
-    // deletar
     tb.querySelectorAll('button[data-delid]').forEach(b=>{
       b.onclick=()=>{ 
         const id=b.getAttribute('data-delid'); 
         const idx=lanc.findIndex(x=>x.id===id); 
         if(idx>=0 && confirm('Remover este lançamento?')){ 
           const removed = lanc[idx];
-          lanc.splice(idx,1); persistLanc(); 
-          // opcional: deletar no Sheets
-          sheetsDelete('lancamentos', removed).catch(()=>{});
-          renderAll(); 
+          lanc.splice(idx,1); persistLanc(); renderAll();
+          // opcional: sheetsDelete('lancamentos', removed);
         }
-      };
-    });
-    // editar
-    tb.querySelectorAll('button[data-editid]').forEach(b=>{
-      b.onclick=()=>{ 
-        const id=b.getAttribute('data-editid'); 
-        const item = lanc.find(x=>x.id===id); if(!item) return;
-        // preencher modal
-        q('#editId').value = item.id;
-        fillOFSelects(true);
-        q('#editOfId').value = item.of_id||'';
-        q('#editData').value = item.data||'';
-        q('#editFornecedor').value = canonicalSupplierName(item.fornecedor||'');
-        q('#editProfissionais').value = item.profissionais||0;
-        q('#editAjudantes').value = item.ajudantes||0;
-        q('#editTipoDia').value = item.tipo_dia||'util';
-        q('#editMateriais').value = (item.materiais||0).toFixed(2).replace('.',',');
-        q('#editTranslado').value = (item.translado||0).toFixed(2).replace('.',',');
-        q('#editAlmoco').value = (item.almoco||0).toFixed(2).replace('.',',');
-        bindMoneyFields();
-        openModal('editModal');
       };
     });
   }
@@ -601,11 +506,6 @@ document.addEventListener('DOMContentLoaded', () => {
     set('#kpiRegistros', rows.length?`${rows.length} registros`:'Sem registros'); 
     set('#kpiHh', `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`); 
     set('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
-
-    if(q('#kpiAlmoco')) q('#kpiAlmoco').textContent = BRL.format(alm);
-    if(q('#kpiTranslado')) q('#kpiTranslado').textContent = BRL.format(tra);
-    if(q('#kpiAlmocoSub')) q('#kpiAlmocoSub').textContent = rows.length?`média ${BRL.format(alm/rows.length)}`:'—';
-    if(q('#kpiTransladoSub')) q('#kpiTransladoSub').textContent = rows.length?`média ${BRL.format(tra/rows.length)}`:'—';
 
     const pillOrcado=q('#pillOrcado'), pillSaldo=q('#pillSaldo');
     if(pillOrcado && pillSaldo){
@@ -694,114 +594,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ===== Config + Sync
-  function ensureConfigUI(){
-    const cont=q('#config .card .form') || q('#config .form') || q('#config');
-    if(!cont) return;
-    function addMoney(id,lbl){
-      if(q('#'+id)){ moneyMaskBind(q('#'+id)); return; }
-      const w=document.createElement('label'); w.className='small';
-      w.innerHTML=`${lbl}<input id="${id}" class="money" />`;
-      cont.insertBefore(w, cont.querySelector('.btns'));
-      moneyMaskBind(w.querySelector('input'));
-    }
-    function addNumber(id,lbl,ph){
-      if(q('#'+id)) return;
-      const w=document.createElement('label'); w.className='small';
-      w.innerHTML=`${lbl}<input type="number" id="${id}" step="0.01" min="0" placeholder="${ph||''}" />`;
-      cont.insertBefore(w, cont.querySelector('.btns'));
-    }
-    function addAlmocoMode(){
-      if(q('#cfgAlmocoMode')) return;
-      const w=document.createElement('label'); w.className='small';
-      w.innerHTML=`Almoço interpreta entrada como
-        <select id="cfgAlmocoMode">
-          <option value="por_pessoa">Por pessoa (ignora campo de lançamento)</option>
-          <option value="qtd">Quantidade de dias (qtd × pessoas × R$)</option>
-          <option value="valor">Valor total (R$) lançado</option>
-        </select>`;
-      cont.insertBefore(w, cont.querySelector('.btns'));
-    }
-
-    addMoney('cfgAlmoco','R$/almoço (por pessoa)');
-    addNumber('cfgMultSab','Multiplicador sábado (ex.: 1,5)','1,5');
-    addNumber('cfgMultDom','Multiplicador domingo/feriado (ex.: 2,0)','2,0');
-    addAlmocoMode();
-
-    // preencher
-    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=(+v||0).toFixed(2).replace('.',','); moneyMaskBind(el); } };
-    const setN=(id,v)=>{ const el=q('#'+id); if(el) el.value = (v ?? ''); };
-
-    if(q('#cfgProf')) setM('cfgProf', cfg.prof);
-    if(q('#cfgAjud')) setM('cfgAjud', cfg.ajud);
-    setM('cfgAlmoco', cfg.almoco);
-    setN('cfgMultSab', cfg.mult_sab ?? 1.5);
-    setN('cfgMultDom', cfg.mult_dom ?? 2.0);
-    const mm=q('#cfgAlmocoMode'); if(mm) mm.value = cfg.almoco_mode || 'por_pessoa';
-    setN('cfgSheetsUrl', cfg.sheets_url || '');
-    setN('cfgSheetsToken', cfg.sheets_token || '');
-
-    const btn=q('#btnSalvarCfg');
-    if(btn && !btn.dataset.bound){
-      btn.dataset.bound='1';
-      btn.onclick=()=>{ 
-        if(q('#cfgProf')) cfg.prof=num(q('#cfgProf').value||0);
-        if(q('#cfgAjud')) cfg.ajud=num(q('#cfgAjud').value||0);
-        cfg.almoco=num(q('#cfgAlmoco')?.value||0);
-        cfg.mult_sab=parseFloat(q('#cfgMultSab')?.value||1.5);
-        cfg.mult_dom=parseFloat(q('#cfgMultDom')?.value||2.0);
-        cfg.almoco_mode=(q('#cfgAlmocoMode')?.value)||'por_pessoa';
-        cfg.sheets_url = (q('#cfgSheetsUrl')?.value||'').trim();
-        cfg.sheets_token = (q('#cfgSheetsToken')?.value||'').trim();
-        persistCfg(); alert('Configurações salvas.'); renderAll();
-      };
-    }
-  }
-
-  // ===== Sheets Hooks (opcionais)
-  function hasSheets(){ return !!(cfg.sheets_url && cfg.sheets_url.startsWith('http')); }
-  async function sheetsUpsert(kind, payload){
-    if(!hasSheets()) return;
-    try{
-      await fetch(cfg.sheets_url, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', ...(cfg.sheets_token? {'X-API-KEY':cfg.sheets_token}: {}) },
-        body: JSON.stringify({ action:'upsert', kind, data: payload })
-      });
-    }catch(e){ console.warn('Sheets upsert falhou', e); }
-  }
-  async function sheetsDelete(kind, payload){
-    if(!hasSheets()) return;
-    try{
-      await fetch(cfg.sheets_url, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', ...(cfg.sheets_token? {'X-API-KEY':cfg.sheets_token}: {}) },
-        body: JSON.stringify({ action:'delete', kind, id: payload.id })
-      });
-    }catch(e){ console.warn('Sheets delete falhou', e); }
-  }
-  async function sheetsSyncAll(){
-    if(!hasSheets()) return alert('Defina a URL do Web App do Sheets nas Configurações.');
-    try{
-      const full = { cfg, ofs, fornecedores:sups, lancamentos:lanc };
-      const resp = await fetch(cfg.sheets_url, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', ...(cfg.sheets_token? {'X-API-KEY':cfg.sheets_token}: {}) },
-        body: JSON.stringify({ action:'sync_all', data: full })
-      });
-      const json = await resp.json().catch(()=> ({}));
-      if(json && json.ok) alert('Sincronizado com Sheets!');
-      else alert('Solicitação enviada. Verifique no Sheets se os dados chegaram.');
-    }catch(e){
-      console.error(e); alert('Falha ao sincronizar com Sheets.');
-    }
-  }
-  const btnSync = q('#btnSyncSheets'); if(btnSync) btnSync.onclick = sheetsSyncAll;
-
-  // ===== Render
   function renderAll(){
     ensureFornecedorDatalist();
-    fillOFSelects(true);
     bindMoneyFields();
     const rows=filtrarDados();
     renderKpis(rows);
@@ -809,7 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(rows);
   }
 
-  // Seeds (apenas se vazio)
+  // Seeds
   if(ofs.length===0){
     ofs=[ {id:'OF-2025-001', cliente:'Bortolaso', orcado:22100, desc:'Adequações civis — etapa 1'},
           {id:'OF-2025-002', cliente:'—', orcado:15000, desc:'Reservado'} ];
