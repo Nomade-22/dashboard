@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard — Adequações Civis (v3.1 + Sheets)</title>
+  <title>Dashboard — Adequações Civis (v3.2 editável + Sheets)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -13,12 +13,13 @@
 <body>
 <header>
   <div class="title">
-    <h1>Dashboard — Adequações Civis (v3.1)</h1>
+    <h1>Dashboard — Adequações Civis (v3.2)</h1>
   </div>
   <div class="tabs">
     <button class="btn" data-tab="dashboard">Dashboard</button>
     <button class="btn" data-tab="lancamentos">Lançamentos</button>
     <button class="btn" data-tab="ofs">OFs</button>
+    <button class="btn" data-tab="fornecedores">Fornecedores</button>
     <button class="btn ghost" data-tab="config">Configurações</button>
   </div>
 </header>
@@ -32,7 +33,9 @@
       </label>
       <label class="small">De:<input type="date" id="fDe"></label>
       <label class="small">Até:<input type="date" id="fAte"></label>
-      <label class="small">Fornecedor:<input type="text" id="fFornecedor" placeholder="Filtrar fornecedor" list="fornList"></label>
+      <label class="small">Fornecedor:
+        <input type="text" id="fFornecedor" placeholder="Filtrar fornecedor" list="fornList">
+      </label>
       <button class="btn" id="btnFiltrar">Aplicar filtros</button>
       <button class="btn ghost" id="btnLimpar">Limpar</button>
       <span class="pill" id="pillOrcado">Orçado: —</span>
@@ -75,8 +78,9 @@
 
       <div class="card" style="grid-column:1 / -1">
         <div class="toolbar">
-          <button class="btn" id="btnSyncSheets" title="Envia tudo para o Sheets (Alt+Clique: baixar JSON)">Sincronizar Sheets</button>
-          <button class="btn" id="btnExportar" title="Exporta CSV de lançamentos (Alt+Clique: JSON completo)">Exportar</button>
+          <button class="btn" id="btnExportPDF">Exportar PDF</button>
+          <button class="btn" id="btnSyncSheets" title="Envia tudo para o Sheets">Sincronizar Sheets</button>
+          <button class="btn" id="btnExportar" title="Exporta CSV (Alt+Clique: JSON completo)">Exportar</button>
           <label class="btn ghost" for="inputCSV">Importar CSV</label>
           <input id="inputCSV" type="file" accept=".csv" style="display:none">
           <span class="muted">CSV: of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado,tipo_dia</span>
@@ -120,6 +124,15 @@
             <label class="small">Almoço (R$)<input id="almoco" class="money" inputmode="numeric"></label>
             <label class="small">Translado (R$)<input id="translado" class="money" inputmode="numeric"></label>
           </div>
+          <div class="row2">
+            <label class="small">Tipo de dia
+              <select id="tipoDia">
+                <option value="util">Dia útil</option>
+                <option value="sabado">Sábado (+50%)</option>
+                <option value="domingo">Domingo/Feriado (+100%)</option>
+              </select>
+            </label>
+          </div>
           <div class="btns">
             <button class="btn primary" type="submit">Adicionar</button>
             <button class="btn ghost" type="reset">Limpar</button>
@@ -162,18 +175,51 @@
     </div>
   </section>
 
+  <!-- FORNECEDORES -->
+  <section id="fornecedores" class="tab">
+    <div class="card">
+      <h2>Cadastro de Fornecedores</h2>
+      <div class="form" style="margin-top:10px">
+        <div class="row2">
+          <label class="small">Nome do fornecedor
+            <input id="supNome" placeholder="Ex.: Bortolaso" />
+          </label>
+          <label class="small">Apelidos (separados por vírgula)
+            <input id="supAliases" placeholder="Ex.: Borto, Bortolaso Ltda" />
+          </label>
+        </div>
+        <div class="btns">
+          <button class="btn primary" id="btnAddSup" type="button">Adicionar</button>
+          <button class="btn" id="btnUnificar" type="button">Unificar lançamentos</button>
+        </div>
+      </div>
+      <div style="margin-top:12px"><div id="supList" class="sup-grid"></div></div>
+      <p class="muted" style="margin-top:10px">“Unificar lançamentos” substitui variações pelo nome cadastrado (sem criar novos).</p>
+    </div>
+  </section>
+
   <!-- CONFIG -->
   <section id="config" class="tab">
-    <div class="card" style="max-width:680px">
+    <div class="card" style="max-width:760px">
       <h3>Configurações</h3>
       <div class="form">
         <div class="row2">
-          <label class="small">R$/dia Profissional
-            <input id="cfgProf" class="money" inputmode="numeric">
+          <label class="small">R$/dia Profissional <input id="cfgProf" class="money" inputmode="numeric"></label>
+          <label class="small">R$/dia Ajudante   <input id="cfgAjud" class="money" inputmode="numeric"></label>
+        </div>
+        <div class="row2">
+          <label class="small">R$/almoço (por pessoa) <input id="cfgAlmoco" class="money" inputmode="numeric"></label>
+          <label class="small">Modo do almoço
+            <select id="cfgAlmocoMode">
+              <option value="por_pessoa">Por pessoa</option>
+              <option value="qtd">Quantidade de dias × pessoas × R$</option>
+              <option value="valor">Valor total lançado</option>
+            </select>
           </label>
-          <label class="small">R$/dia Ajudante
-            <input id="cfgAjud" class="money" inputmode="numeric">
-          </label>
+        </div>
+        <div class="row2">
+          <label class="small">Multiplicador sábado (ex.: 1,5) <input type="number" id="cfgMultSab" step="0.01" min="0"></label>
+          <label class="small">Multiplicador domingo/feriado (ex.: 2,0) <input type="number" id="cfgMultDom" step="0.01" min="0"></label>
         </div>
 
         <!-- Integração Google Sheets -->
@@ -189,9 +235,8 @@
         <div class="btns">
           <button class="btn primary" id="btnSalvarCfg">Salvar</button>
           <button class="btn" id="btnLoadSheets">Carregar do Sheets</button>
-          <button class="btn" id="btnExportPDF">Exportar PDF</button>
         </div>
-        <p class="muted">Preencha a URL do seu Web App (termina com <code>/exec</code>). Clique “Carregar do Sheets” para puxar dados; “Sincronizar Sheets” na dashboard envia tudo.</p>
+        <p class="muted">Cole a URL do Web App (termina com <code>/exec</code>). “Sincronizar Sheets” na Dashboard envia tudo.</p>
       </div>
     </div>
   </section>
