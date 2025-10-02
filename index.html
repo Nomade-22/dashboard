@@ -78,7 +78,8 @@
           <button class="btn" id="btnExportar">Exportar CSV</button>
           <label class="btn ghost" for="inputCSV">Importar CSV</label>
           <input id="inputCSV" type="file" accept=".csv" style="display:none">
-          <span class="muted">CSV: of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado</span>
+          <button class="btn ghost" id="btnSyncSheets">Sincronizar Sheets</button>
+          <span class="muted">CSV: of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado,tipo_dia</span>
         </div>
         <div class="table-wrap">
           <table id="tabela">
@@ -170,6 +171,15 @@
         <label class="small">R$/dia Ajudante
           <input type="number" id="cfgAjud" step="0.01" min="0">
         </label>
+
+        <!-- NOVO: Config Google Sheets -->
+        <label class="small">Sheets Web App URL
+          <input type="url" id="cfgSheetsUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+        </label>
+        <label class="small">Sheets API Token (opcional)
+          <input type="text" id="cfgSheetsToken" placeholder="ex.: MEU_TOKEN_SECRETO">
+        </label>
+
         <div class="btns">
           <button class="btn primary" id="btnSalvarCfg">Salvar</button>
           <button class="btn" id="btnResetar">Resetar dados (lançamentos)</button>
@@ -179,6 +189,58 @@
     </div>
   </section>
 </main>
+
+<!-- MODAL DE EDIÇÃO -->
+<div class="modal" id="editModal" aria-hidden="true">
+  <div class="modal-backdrop" data-close="editModal"></div>
+  <div class="modal-card">
+    <h3>Editar Lançamento</h3>
+    <form id="formEdit" class="form">
+      <input type="hidden" id="editId">
+      <label class="small">OF
+        <select id="editOfId" required></select>
+      </label>
+      <label class="small">Data
+        <input type="date" id="editData" required>
+      </label>
+      <label class="small">Fornecedor
+        <input type="text" id="editFornecedor" list="fornList">
+      </label>
+      <div class="row2">
+        <label class="small">Materiais (R$)
+          <input id="editMateriais">
+        </label>
+        <label class="small">Translado (R$)
+          <input id="editTranslado">
+        </label>
+      </div>
+      <div class="row2">
+        <label class="small">Profissionais (qtd)
+          <input type="number" id="editProfissionais" min="0" step="1">
+        </label>
+        <label class="small">Ajudantes (qtd)
+          <input type="number" id="editAjudantes" min="0" step="1">
+        </label>
+      </div>
+      <div class="row2">
+        <label class="small">Almoço (R$ ou qtd)
+          <input id="editAlmoco">
+        </label>
+        <label class="small">Tipo de Dia
+          <select id="editTipoDia">
+            <option value="util">Dia útil</option>
+            <option value="sabado">Sábado (+50%)</option>
+            <option value="domingo">Domingo/Feriado (+100%)</option>
+          </select>
+        </label>
+      </div>
+      <div class="btns">
+        <button class="btn primary" type="submit">Salvar</button>
+        <button class="btn ghost" data-close="editModal" type="button">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script src="script.js"></script>
 </body>
