@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard — Adequações Civis (v3.3)</title>
+  <title>Dashboard — Adequações Civis (v3.3.4)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -60,7 +60,6 @@
         <div class="value" id="kpiTotal">R$ 0,00</div>
         <div class="sub" id="kpiRegistros">—</div>
       </div>
-      <!-- KPIs extras -->
       <div class="card kpi">
         <div class="label">Somente Almoço</div>
         <div class="value" id="kpiAlmoco">R$ 0,00</div>
@@ -74,12 +73,8 @@
     </div>
 
     <div class="grid">
-      <div class="card">
-        <div class="chart-wrap"><canvas id="graficoEvolucao"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="chart-wrap"><canvas id="graficoCategorias"></canvas></div>
-      </div>
+      <div class="card"><div class="chart-wrap"><canvas id="graficoEvolucao"></canvas></div></div>
+      <div class="card"><div class="chart-wrap"><canvas id="graficoCategorias"></canvas></div></div>
       <div class="card" style="grid-column:1 / -1">
         <div class="chart-wrap"><canvas id="graficoFornecedores"></canvas></div>
       </div>
