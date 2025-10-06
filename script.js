@@ -1,4 +1,4 @@
-// Dashboard Adequações Civis v3.3
+// Dashboard Adequações Civis v3.3.1
 // – Máscara BRL com buffer de dígitos
 // – Lançamentos editáveis (inline via formulário)
 // – CSV simétrico
@@ -146,7 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const id=b.dataset.delsup; 
         const s=sups.find(x=>x.id===id);
         sups=sups.filter(x=>x.id!==id); persistSup();
-        // limpa fornecedor dos lançamentos que tinham esse nome/aliases
         if(s){ const all=[s.name,...(s.aliases||[])].map(x=>normalize(x));
           lanc.forEach(l=>{ if(all.includes(normalize(l.fornecedor||''))) l.fornecedor=''; }); persistLanc(); }
         renderSupUI(); ensureFornecedorDatalist(); renderAll();
@@ -329,7 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if(i>=0){
           lanc[i] = { ...lanc[i], of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia };
           persistLanc();
-          // upsert remoto
           try{ await sheetsPost('upsert_lanc', { lanc:lanc[i] }); }catch(e){ console.warn('upsert_lanc falhou:', e.message); }
         }
         leaveEdit();
@@ -338,7 +336,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const item={id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia};
         lanc.push(item); persistAll();
         try{ await sheetsPost('upsert_lanc', { lanc:item }); }catch(e){ console.warn('upsert_lanc falhou:', e.message); }
+        // pronto para o próximo
+        editId = null;
         form.reset();
+        bindMoneyFields();           // reanexa máscaras
+        if (q('#ofId')) q('#ofId').value = of_id; // mantém OF
+        if (q('#data')) q('#data').focus();       // foca para próximo lançamento
         alert('Lançamento adicionado.');
       }
       ensureFornecedorDatalist();
@@ -614,7 +617,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sheetsToken()) u.searchParams.set('token', sheetsToken());
 
     const fd = new FormData();
-    // pacote completo no campo "payload", que o doPost do Apps Script já trata
     fd.append('payload', JSON.stringify(payload || {}));
 
     const r = await fetch(u.toString(), { method:'POST', body: fd });
@@ -659,7 +661,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function ensureConfigUI(){
-    // set values
     const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=(+v||0).toFixed(2).replace('.',','); moneyMaskBind(el); } };
     const setN=(id,v)=>{ const el=q('#'+id); if(el) el.value = (v ?? ''); };
     setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
@@ -693,7 +694,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderKpis(filtered);
     renderCharts(filtered);
     renderTable(filtered);
-    renderSupUI(); // Renderiza a lista de fornecedores na aba "fornecedores"
+    renderSupUI();
   }
 
   // ==== Inicialização
