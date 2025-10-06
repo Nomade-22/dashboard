@@ -605,18 +605,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!r.ok) throw new Error(`GET ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
     try{ return JSON.parse(t); }catch{ throw new Error(`GET ${action} JSON inválido: ${t.slice(0,200)}`); }
   }
-  async function sheetsPost(action, payload){
-    const urlStr = sheetsUrl(); if(!urlStr) throw new Error('Sheets URL vazia');
-    const u = new URL(urlStr); u.searchParams.set('action', action);
-    if (sheetsToken()) u.searchParams.set('token', sheetsToken());
-    const r = await fetch(u.toString(), {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ ...payload, token: sheetsToken() })
-    });
-    const t = await r.text();
-    if(!r.ok) throw new Error(`POST ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
-    try{ return JSON.parse(t); }catch{ throw new Error(`POST ${action} JSON inválido: ${t.slice(0,200)}`); }
-  }
+ 
+ // ====================================================================
+ // *** CORREÇÃO APLICADA AQUI: sheetsPost com Content-Type para CORS ***
+ // ====================================================================
+ async function sheetsPost(action, payload){
+    const urlStr = sheetsUrl(); if(!urlStr) throw new Error('Sheets URL vazia');
+    
+    // Constrói a URL corretamente com a ação
+    const u = new URL(urlStr); 
+    u.searchParams.set('action', action);
+    
+    // Adiciona o token, se existir, na URL
+    if (sheetsToken()) u.searchParams.set('token', sheetsToken());
+    
+    // Remove o token do payload para ter um JSON de dados limpo para o Apps Script
+    const payloadToSend = { ...payload };
+    delete payloadToSend.token;
+
+    const r = await fetch(u.toString(), {
+      method:'POST', 
+      // CORREÇÃO ESSENCIAL para o Apps Script aceitar o body
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payloadToSend)
+    });
+    
+    const t = await r.text();
+    if(!r.ok) throw new Error(`POST ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
+    try{ return JSON.parse(t); }catch{ throw new Error(`POST ${action} JSON inválido: ${t.slice(0,200)}`); }
+}
+// ====================================================================
+// *** FIM DA CORREÇÃO ***
+// ====================================================================
+
   async function testSheetsConnection(){
     const urlStr = sheetsUrl();
     if(!urlStr) return alert('Cole a URL do Web App (termina com /exec).');
@@ -675,4 +696,23 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     }
     const bLoad=q('#btnLoadSheets'); if(bLoad && !bLoad.dataset.bound){ bLoad.dataset.bound='1'; bLoad.onclick=()=> loadFromSheets().catch(e=>alert('Erro: '+e.message)); }
-    const bSync=q('#btnSyncSheets'); if(bSync && !bSync.dataset.bound){ bSync.dataset.bound='1'; bSync.onclick=()=> syncSheets().catch(
+    const bSync=q('#btnSyncSheets'); if(bSync && !bSync.dataset.bound){ bSync.dataset.bound='1'; bSync.onclick=()=> syncSheets().catch(e=>alert('Erro: '+e.message)); }
+    const bTest=q('#btnTestSheets'); if(bTest && !bTest.dataset.bound){ bTest.dataset.bound='1'; bTest.onclick=()=> testSheetsConnection().catch(e=>alert('Erro: '+e.message)); }
+  }
+
+  // ==== RENDER ALL
+  function renderAll(){
+    const filtered=filtrarDados();
+    renderKpis(filtered);
+    renderCharts(filtered);
+    renderTable(filtered);
+    renderSupUI(); // Renderiza a lista de fornecedores na aba "fornecedores"
+  }
+
+  // ==== Inicialização
+  renderAll();
+  fillOFSelects(true);
+  ensureFornecedorDatalist();
+  bindMoneyFields();
+
+});
