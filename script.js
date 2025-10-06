@@ -1,10 +1,5 @@
-// Dashboard Adequações Civis v3.3.1
-// – Máscara BRL com buffer de dígitos
-// – Lançamentos editáveis (inline via formulário)
-// – CSV simétrico
-// – Aba Fornecedores
-// – Integração Google Sheets (URL/Token, Testar, Carregar, Sincronizar)
-// – Gráficos mobile compactos
+// Dashboard Adequações Civis v3.3.2
+// Compatível com Apps Script recebendo JSON (padrão) e também FormData (fallback no servidor)
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -171,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpFiltro=q('#fFornecedor'); if(inpFiltro) inpFiltro.setAttribute('list','fornList');
   }
 
-  // ==== Máscara BRL com buffer
+  // ==== Máscara BRL
   function forceTextInput(el){
     if(!el) return el;
     if((el.type||'').toLowerCase() === 'text') return el;
@@ -339,9 +334,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // pronto para o próximo
         editId = null;
         form.reset();
-        bindMoneyFields();           // reanexa máscaras
-        if (q('#ofId')) q('#ofId').value = of_id; // mantém OF
-        if (q('#data')) q('#data').focus();       // foca para próximo lançamento
+        bindMoneyFields();
+        if (q('#ofId')) q('#ofId').value = of_id;
+        if (q('#data')) q('#data').focus();
         alert('Lançamento adicionado.');
       }
       ensureFornecedorDatalist();
@@ -361,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ==== CSV (simétrico)
+  // ==== CSV
   const CSV_HEAD=['of_id','data','fornecedor','materiais','profissionais','ajudantes','almoco','translado','tipo_dia'];
   function exportCsvLancamentos(filename='adequacoes_civis_lancamentos.csv'){
     const rows=[CSV_HEAD];
@@ -504,4 +499,217 @@ document.addEventListener('DOMContentLoaded', () => {
     set('#kpiRegistros', rows.length?`${rows.length} registros`:'Sem registros'); 
     set('#kpiHh', `${sum(rows, r=> r.profissionais + r.ajudantes)} pessoas·dia`); 
     set('#kpiIndPct', `Indiretos ${total?(ind/total*100).toFixed(1):0}%`);
-    if(q('#kpiAlmoco')) q('#kpiAlmoco').textContent = BRL.f
+    if(q('#kpiAlmoco')) q('#kpiAlmoco').textContent = BRL.format(alm);
+    if(q('#kpiTranslado')) q('#kpiTranslado').textContent = BRL.format(tra);
+    if(q('#kpiAlmocoSub')) q('#kpiAlmocoSub').textContent = rows.length?`média ${BRL.format(alm/rows.length)}`:'—';
+    if(q('#kpiTransladoSub')) q('#kpiTransladoSub').textContent = rows.length?`média ${BRL.format(tra/rows.length)}`:'—';
+
+    const pillOrcado=q('#pillOrcado'), pillSaldo=q('#pillSaldo');
+    if(pillOrcado && pillSaldo){
+      const sel=q('#selOF')?.value||'__ALL__'; let orcado=0, gastoOF=0;
+      if(sel!=='__ALL__'){ const of=ofs.find(o=>o.id===sel); orcado=of?(+of.orcado||0):0; gastoOF=sum(lanc.filter(l=>l.of_id===sel), l=>gastoLanc(l)); }
+      else{ orcado=sum(ofs, o=> +o.orcado||0); gastoOF=sum(lanc, l=> gastoLanc(l)); }
+      const saldo=orcado-gastoOF; pillOrcado.textContent=`Orçado: ${orcado?BRL.format(orcado):'—'}`; pillSaldo.textContent=`Saldo: ${BRL.format(saldo)}`;
+      pillSaldo.classList.remove('tag-warn','tag-danger');
+      if(orcado>0){ const p=gastoOF/orcado; if(saldo<0) pillSaldo.classList.add('tag-danger'); else if(p>=0.8) pillSaldo.classList.add('tag-warn'); }
+    }
+  }
+  let chEvo=null, chCat=null, chForn=null;
+  function isMobile(){ return window.matchMedia('(max-width: 640px)').matches; }
+  function mobileTuning(base){
+    if(!isMobile()) return base;
+    const tuned = JSON.parse(JSON.stringify(base));
+    tuned.options = tuned.options || {};
+    tuned.options.maintainAspectRatio = false;
+    tuned.options.plugins = tuned.options.plugins || {};
+    tuned.options.plugins.legend = tuned.options.plugins.legend || {};
+    if(tuned.options.plugins.legend.labels){
+      tuned.options.plugins.legend.labels.font = { size: 10 };
+    } else {
+      tuned.options.plugins.legend.labels = { font: { size: 10 } };
+    }
+    tuned.options.scales = tuned.options.scales || {};
+    if(tuned.options.scales.x){ tuned.options.scales.x.ticks = { maxTicksLimit: 6, autoSkip: true }; }
+    if(tuned.options.scales.y){ tuned.options.scales.y.ticks = { callback:(v)=>BRL.format(v), maxTicksLimit: 5 }; }
+    if(tuned.data && Array.isArray(tuned.data.datasets)){
+      tuned.data.datasets = tuned.data.datasets.map(ds=>{
+        const out = {...ds};
+        if(tuned.type==='line'){ out.tension = .25; out.pointRadius = 2; out.borderWidth = 2; }
+        if(tuned.type==='bar'){ out.maxBarThickness = 24; }
+        return out;
+      });
+    }
+    return tuned;
+  }
+  function renderCharts(rows){
+    const byDateRaw={}; rows.forEach(r=>{ const k=r.data||'—'; byDateRaw[k]=(byDateRaw[k]||0)+gastoLanc(r); });
+    const dates = Object.keys(byDateRaw).sort();
+    const labels = dates.map(d => d==='—' ? '—' : fmtBRDate(d));
+    const series = dates.map(d => byDateRaw[d]);
+
+    const cat = {
+      'Materiais': sum(rows, r=> +r.materiais||0),
+      'Mão de Obra': sum(rows, r=> { const f = fatorDia(r.tipo_dia||'util'); return r.profissionais*(+cfg.prof||0)*f + r.ajudantes*(+cfg.ajud||0)*f; }),
+      'Indiretos': sum(rows, r=> almocoTotalDe(r) + (+r.translado||0)),
+    };
+    const byForn = {};
+    rows.forEach(r=>{
+      const vm=+r.materiais||0;
+      const forn=canonicalSupplierName(r.fornecedor||'');
+      if(vm>0&&forn){ byForn[forn]=(byForn[forn]||0)+vm; }
+    });
+
+    [chEvo,chCat,chForn].forEach(ch=> ch && ch.destroy());
+
+    const e1=q('#graficoEvolucao'); 
+    if(e1){
+      const cfg1 = mobileTuning({
+        type:'line',
+        data:{ labels, datasets:[{ label:'Total por dia', data:series, tension:.25 }]},
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
+      });
+      chEvo = new Chart(e1.getContext('2d'), cfg1);
+    }
+    const e2=q('#graficoCategorias'); 
+    if(e2){
+      const cfg2 = mobileTuning({
+        type:'doughnut',
+        data:{ labels:Object.keys(cat), datasets:[{ data:Object.values(cat) }]},
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
+      });
+      chCat = new Chart(e2.getContext('2d'), cfg2);
+    }
+    const e3=q('#graficoFornecedores'); 
+    if(e3){
+      const cfg3 = mobileTuning({
+        type:'bar',
+        data:{ labels:Object.keys(byForn), datasets:[{ label:'Materiais por fornecedor', data:Object.values(byForn) }]},
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>BRL.format(v) } } } }
+      });
+      chForn = new Chart(e3.getContext('2d'), cfg3);
+    }
+  }
+
+  // ==== Config + Integração Sheets
+  function sheetsUrl(){ return (q('#cfgSheetsUrl')?.value || cfg.sheets_url || '').trim(); }
+  function sheetsToken(){ return (q('#cfgSheetsToken')?.value || cfg.sheets_token || '').trim(); }
+
+  async function sheetsGet(action){
+    const urlStr = sheetsUrl(); if(!urlStr) throw new Error('Sheets URL vazia');
+    const u = new URL(urlStr); u.searchParams.set('action', action);
+    if (sheetsToken()) u.searchParams.set('token', sheetsToken());
+    const r = await fetch(u.toString(), { method:'GET' });
+    const t = await r.text();
+    if(!r.ok) throw new Error(`GET ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
+    try{ return JSON.parse(t); }catch{ throw new Error(`GET ${action} JSON inválido: ${t.slice(0,200)}`); }
+  }
+
+  // envia JSON (compatível com doPost padrão desta versão)
+  async function sheetsPost(action, payload){
+    const urlStr = sheetsUrl(); if(!urlStr) throw new Error('Sheets URL vazia');
+    const u = new URL(urlStr);
+    u.searchParams.set('action', action);
+    if (sheetsToken()) u.searchParams.set('token', sheetsToken());
+
+    const r = await fetch(u.toString(), {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(payload || {})
+    });
+
+    const t = await r.text();
+    if(!r.ok) throw new Error(`POST ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
+    let data; try { data = JSON.parse(t); } catch { throw new Error(`POST ${action} JSON inválido: ${t.slice(0,200)}`); }
+    if (!data.ok) throw new Error(data.error || 'Falha no servidor');
+    return data;
+  }
+
+  async function testSheetsConnection(){
+    const urlStr = sheetsUrl();
+    if(!urlStr) return alert('Cole a URL do Web App (termina com /exec).');
+    try{
+      const u = new URL(urlStr);
+      u.searchParams.set('action','test');
+      if (sheetsToken()) u.searchParams.set('token', sheetsToken());
+      const resp = await fetch(u.toString(), { method:'GET' });
+      const text = await resp.text();
+      let json=null; try{ json = JSON.parse(text); }catch{}
+      if(!resp.ok){ alert(`Falha HTTP ${resp.status}\nBody:\n${text.slice(0,400)}...`); return; }
+      if(!json || json.ok!==true){ alert(`Resposta inesperada do Web App.\nBody:\n${text.slice(0,400)}...`); return; }
+      alert(json.message || 'Conexão OK!');
+    }catch(err){ alert('Erro de rede/fetch: ' + (err?.message||err)); }
+  }
+  async function loadFromSheets(){
+    const res = await sheetsGet('load');
+    if(!res.ok) throw new Error(res.error || 'Falha ao carregar');
+    const d = res.data || {};
+    if(d.ofs) ofs = d.ofs;
+    if(d.fornecedores) sups = d.fornecedores;
+    if(d.lancamentos) lanc = d.lancamentos;
+    if(d.cfg) cfg = { ...cfg, ...d.cfg };
+    persistAll(); fillOFSelects(true); ensureFornecedorDatalist(); renderOFs(); renderAll();
+  }
+  async function syncSheets(){
+    const payload = { cfg, ofs, fornecedores:sups, lancamentos:lanc };
+    const res = await sheetsPost('sync_all', payload);
+
+    const recv = res.recv || {};
+    const saved = res.saved || {};
+    alert(
+      'Sincronizado com o Google Sheets!\n\n' +
+      `Recebido pelo servidor:\n` +
+      `• lançamentos: ${recv.lanc}\n` +
+      `• OFs: ${recv.ofs}\n` +
+      `• fornecedores: ${recv.forn}\n` +
+      `• chaves de config: ${recv.cfg}\n\n` +
+      `Gravado na planilha:\n` +
+      `• lançamentos: ${saved.lanc}\n` +
+      `• OFs: ${saved.ofs}\n` +
+      `• fornecedores: ${saved.forn}`
+    );
+  }
+
+  function ensureConfigUI(){
+    const setM=(id,v)=>{ const el=q('#'+id); if(el){ el.value=(+v||0).toFixed(2).replace('.',','); moneyMaskBind(el); } };
+    const setN=(id,v)=>{ const el=q('#'+id); if(el) el.value = (v ?? ''); };
+    setM('cfgProf',cfg.prof); setM('cfgAjud',cfg.ajud); setM('cfgAlmoco',cfg.almoco);
+    setN('cfgMultSab',cfg.mult_sab??1.5); setN('cfgMultDom',cfg.mult_dom??2.0);
+    setN('cfgAlmocoMode',cfg.almoco_mode||'por_pessoa');
+    setN('cfgSheetsUrl',cfg.sheets_url||''); setN('cfgSheetsToken',cfg.sheets_token||'');
+
+    const btn=q('#btnSalvarCfg');
+    if(btn && !btn.dataset.bound){
+      btn.dataset.bound='1';
+      btn.onclick=()=>{ 
+        cfg.prof=num(q('#cfgProf')?.value||0); 
+        cfg.ajud=num(q('#cfgAjud')?.value||0); 
+        cfg.almoco=num(q('#cfgAlmoco')?.value||0); 
+        cfg.mult_sab=parseFloat(q('#cfgMultSab')?.value||1.5); 
+        cfg.mult_dom=parseFloat(q('#cfgMultDom')?.value||2.0); 
+        cfg.almoco_mode=(q('#cfgAlmocoMode')?.value)||'por_pessoa';
+        cfg.sheets_url=(q('#cfgSheetsUrl')?.value||'').trim();
+        cfg.sheets_token=(q('#cfgSheetsToken')?.value||'').trim();
+        persistCfg(); alert('Configurações salvas.'); renderAll();
+      };
+    }
+    const bLoad=q('#btnLoadSheets'); if(bLoad && !bLoad.dataset.bound){ bLoad.dataset.bound='1'; bLoad.onclick=()=> loadFromSheets().catch(e=>alert('Erro: '+e.message)); }
+    const bSync=q('#btnSyncSheets'); if(bSync && !bSync.dataset.bound){ bSync.dataset.bound='1'; bSync.onclick=()=> syncSheets().catch(e=>alert('Erro: '+e.message)); }
+    const bTest=q('#btnTestSheets'); if(bTest && !bTest.dataset.bound){ bTest.dataset.bound='1'; bTest.onclick=()=> testSheetsConnection().catch(e=>alert('Erro: '+e.message)); }
+  }
+
+  // ==== RENDER ALL
+  function renderAll(){
+    const filtered=filtrarDados();
+    renderKpis(filtered);
+    renderCharts(filtered);
+    renderTable(filtered);
+    renderSupUI();
+  }
+
+  // ==== Inicialização
+  renderAll();
+  fillOFSelects(true);
+  ensureFornecedorDatalist();
+  bindMoneyFields();
+
+});
