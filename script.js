@@ -5,10 +5,10 @@
 // – Aba Fornecedores
 // – Integração Google Sheets (URL/Token, Testar, Carregar, Sincronizar)
 // – Gráficos mobile compactos
-// Ajustes (necessários):
+// Ajustes necessários:
 //  • Preserva OF selecionada entre lançamentos
 //  • Edição estável (enterEdit/leaveEdit revisados)
-//  • reset do form não limpa OF (evita travar novo submit)
+//  • cache-buster no GET/POST (evita cache do Apps Script)
 
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(id==='dashboard') renderAll();
     if(id==='lancamentos'){
       fillOFSelects(true);
-      // garante que sempre haja uma OF selecionada (ajuste necessário)
+      // garante que sempre haja uma OF selecionada
       const sel = q('#ofId');
       if(sel && !sel.value && sel.options.length){
         sel.value = sel.options[0].value;
@@ -296,7 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const form=q('#form');
   let editId=null;
 
-  // ======== AJUSTADO: enterEdit / leaveEdit ========
   function enterEdit(l){
     editId = l.id;
     q('#formTitle').textContent='Editar Lançamento';
@@ -325,7 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = q('#btnSalvarLanc'); if(btn) btn.textContent='Adicionar';
     const cancel = q('#btnCancelarEdit'); if(cancel) cancel.style.display='none';
 
-    // limpamos apenas campos de valor (preserva OF selecionada)
+    // limpa apenas campos de valor (preserva OF selecionada)
     q('#data').value='';
     q('#fornecedor').value='';
     q('#materiais').value='';
@@ -340,13 +339,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if(form){
     bindMoneyFields();
 
-    // ======== AJUSTADO: reset não limpa OF ========
+    // reset não limpa OF
     form.addEventListener('reset', (e)=>{
       e.preventDefault();
       leaveEdit();
     });
 
-    // ======== AJUSTADO: submit preservando OF e sem form.reset() ========
     form.addEventListener('submit', async (e)=>{
       e.preventDefault();
       const ofSel = q('#ofId');
@@ -376,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const item={id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia};
         lanc.push(item); persistAll();
         try{ await sheetsPost('upsert_lanc', { lanc:item }); }catch(e){ console.warn('upsert_lanc falhou:', e?.message||e); }
-        // limpa apenas campos de valor e mantém a OF para o próximo lançamento
+        // limpa campos e mantém a OF para o próximo lançamento
         q('#data').value='';
         q('#fornecedor').value='';
         q('#materiais').value='';
@@ -646,20 +644,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function sheetsGet(action){
     const urlStr = sheetsUrl(); if(!urlStr) throw new Error('Sheets URL vazia');
-    const u = new URL(urlStr); u.searchParams.set('action', action);
+    const u = new URL(urlStr);
+    u.searchParams.set('action', action);
     if (sheetsToken()) u.searchParams.set('token', sheetsToken());
+    u.searchParams.set('_', Date.now());          // cache-buster
     const r = await fetch(u.toString(), { method:'GET' });
     const t = await r.text();
     if(!r.ok) throw new Error(`GET ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
     try{ return JSON.parse(t); }catch{ throw new Error(`GET ${action} JSON inválido: ${t.slice(0,200)}`); }
   }
 
-  // POST com JSON (mantido)
   async function sheetsPost(action, payload){
     const urlStr = sheetsUrl(); if(!urlStr) throw new Error('Sheets URL vazia');
-    const u = new URL(urlStr);
+    const u = new URL(urlStr); 
     u.searchParams.set('action', action);
     if (sheetsToken()) u.searchParams.set('token', sheetsToken());
+    u.searchParams.set('_', Date.now());          // cache-buster
 
     const payloadToSend = { ...payload };
     delete payloadToSend.token;
@@ -681,17 +681,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const u = new URL(urlStr);
       u.searchParams.set('action','load');
       if (sheetsToken()) u.searchParams.set('token', sheetsToken());
+      u.searchParams.set('_', Date.now());        // cache-buster
       const resp = await fetch(u.toString(), { method:'GET' });
       const text = await resp.text();
       let json=null; try{ json = JSON.parse(text); }catch{}
       if(!resp.ok){ alert(`Falha HTTP ${resp.status}\nBody:\n${text.slice(0,400)}...`); return; }
       if(!json || json.ok!==true){ alert(`Resposta inesperada do Web App.\nBody:\n${text.slice(0,400)}...`); return; }
       alert('Conexão OK! Dados disponíveis no Web App.');
-      console.log('LOAD data:', json.data);
     }catch(err){ alert('Erro de rede/fetch: ' + (err?.message||err)); }
   }
   async function loadFromSheets(){
-    const res = await sheetsGet('load'); // espera { ok:true, data:{lancamentos,ofs,fornecedores,cfg} }
+    const res = await sheetsGet('load'); // { ok:true, data:{lancamentos,ofs,fornecedores,cfg} }
     if(!res.ok) throw new Error(res.error || 'Falha ao carregar');
     const d = res.data || {};
     if(d.ofs) ofs = d.ofs;
@@ -749,5 +749,4 @@ document.addEventListener('DOMContentLoaded', () => {
   fillOFSelects(true);
   ensureFornecedorDatalist();
   bindMoneyFields();
-
 });
