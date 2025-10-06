@@ -1,4 +1,15 @@
-// Dashboard Adequações Civis v3.3.4
+// Dashboard Adequações Civis v3.3
+// – Máscara BRL com buffer de dígitos
+// – Lançamentos editáveis (inline via formulário)
+// – CSV simétrico
+// – Aba Fornecedores
+// – Integração Google Sheets (URL/Token, Testar, Carregar, Sincronizar)
+// – Gráficos mobile compactos
+// Ajustes (necessários):
+//  • Preserva OF selecionada entre lançamentos
+//  • Edição estável (enterEdit/leaveEdit revisados)
+//  • reset do form não limpa OF (evita travar novo submit)
+
 document.addEventListener('DOMContentLoaded', () => {
   const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 
@@ -78,7 +89,16 @@ document.addEventListener('DOMContentLoaded', () => {
     ev.preventDefault(); qa('.tab').forEach(t=>t.classList.remove('active'));
     const id=b.dataset.tab, tgt=q('#'+id); if(tgt) tgt.classList.add('active');
     if(id==='dashboard') renderAll();
-    if(id==='lancamentos'){ fillOFSelects(true); ensureFornecedorDatalist(); bindMoneyFields(); }
+    if(id==='lancamentos'){
+      fillOFSelects(true);
+      // garante que sempre haja uma OF selecionada (ajuste necessário)
+      const sel = q('#ofId');
+      if(sel && !sel.value && sel.options.length){
+        sel.value = sel.options[0].value;
+      }
+      ensureFornecedorDatalist();
+      bindMoneyFields();
+    }
     if(id==='ofs'){ renderOFs(); fillOFSelects(true); bindMoneyFields(); }
     if(id==='config'){ ensureConfigUI(); bindMoneyFields(); }
     if(id==='fornecedores'){ renderSupUI(); }
@@ -164,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpFiltro=q('#fFornecedor'); if(inpFiltro) inpFiltro.setAttribute('list','fornList');
   }
 
-  // ==== Máscara BRL com buffer de dígitos
+  // ==== Máscara BRL com buffer
   function forceTextInput(el){
     if(!el) return el;
     if((el.type||'').toLowerCase() === 'text') return el;
@@ -275,61 +295,98 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==== Lançamentos (CRUD com edição)
   const form=q('#form');
   let editId=null;
+
+  // ======== AJUSTADO: enterEdit / leaveEdit ========
   function enterEdit(l){
     editId = l.id;
     q('#formTitle').textContent='Editar Lançamento';
-    q('#btnSalvarLanc').textContent='Salvar';
-    q('#btnCancelarEdit').style.display='';
+    const btn = q('#btnSalvarLanc'); if(btn) btn.textContent='Salvar';
+    const cancel = q('#btnCancelarEdit'); if(cancel) cancel.style.display='';
     q('[data-tab="lancamentos"]').click?.();
+
     q('#editId').value=l.id;
-    q('#ofId').value=l.of_id;
-    q('#data').value=l.data||'';
-    q('#fornecedor').value=l.fornecedor||'';
-    q('#materiais').value = BRL.format(+l.materiais||0);
+    q('#ofId').value=l.of_id || '';
+    q('#data').value=l.data || '';
+    q('#fornecedor').value=l.fornecedor || '';
+
+    q('#materiais').value = (Number.isFinite(+l.materiais) ? (+l.materiais).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00');
     q('#profissionais').value=l.profissionais||0;
     q('#ajudantes').value=l.ajudantes||0;
-    q('#almoco').value = BRL.format(+l.almoco||0);
-    q('#translado').value = BRL.format(+l.translado||0);
+    q('#almoco').value = (Number.isFinite(+l.almoco) ? (+l.almoco).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00');
+    q('#translado').value = (Number.isFinite(+l.translado) ? (+l.translado).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00');
     q('#tipoDia').value=l.tipo_dia||'util';
+
     bindMoneyFields();
   }
   function leaveEdit(){
     editId = null;
     q('#editId').value='';
     q('#formTitle').textContent='Novo Lançamento';
-    q('#btnSalvarLanc').textContent='Adicionar';
-    q('#btnCancelarEdit').style.display='none';
-    form.reset();
+    const btn = q('#btnSalvarLanc'); if(btn) btn.textContent='Adicionar';
+    const cancel = q('#btnCancelarEdit'); if(cancel) cancel.style.display='none';
+
+    // limpamos apenas campos de valor (preserva OF selecionada)
+    q('#data').value='';
+    q('#fornecedor').value='';
+    q('#materiais').value='';
+    q('#profissionais').value=0;
+    q('#ajudantes').value=0;
+    q('#almoco').value='';
+    q('#translado').value='';
+    q('#tipoDia').value='util';
+    bindMoneyFields();
   }
+
   if(form){
     bindMoneyFields();
-    form.addEventListener('reset', ()=> { setTimeout(leaveEdit, 0); });
+
+    // ======== AJUSTADO: reset não limpa OF ========
+    form.addEventListener('reset', (e)=>{
+      e.preventDefault();
+      leaveEdit();
+    });
+
+    // ======== AJUSTADO: submit preservando OF e sem form.reset() ========
     form.addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const of_id=q('#ofId')?.value; if(!of_id) return alert('Selecione uma OF.');
-      const data=q('#data')?.value||'';
-      const fornecedor=canonicalSupplierName((q('#fornecedor')?.value||'').trim());
-      const materiais=num(q('#materiais')?.value||0);
-      const profissionais=parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
-      const ajudantes=parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
-      const almocoInput=num(q('#almoco')?.value||0);
-      const translado=num((q('#translado')?.value)||0);
-      const tipo_dia=(q('#tipoDia')?.value)||'util';
+      const ofSel = q('#ofId');
+      const prevOF = ofSel?.value || '';
+      if(!prevOF){ alert('Selecione uma OF.'); return; }
+
+      const of_id = prevOF;
+      const data = q('#data')?.value||'';
+      const fornecedor = canonicalSupplierName((q('#fornecedor')?.value||'').trim());
+      const materiais = num(q('#materiais')?.value||0);
+      const profissionais = parseInt((q('#profissionais')?.value||'').toString().replace(/\D/g,''))||0;
+      const ajudantes = parseInt((q('#ajudantes')?.value||'').toString().replace(/\D/g,''))||0;
+      const almocoInput = num(q('#almoco')?.value||0);
+      const translado = num(q('#translado')?.value||0);
+      const tipo_dia = (q('#tipoDia')?.value)||'util';
 
       if(editId){
         const i = lanc.findIndex(x=>x.id===editId);
         if(i>=0){
           lanc[i] = { ...lanc[i], of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia };
           persistLanc();
-          try{ await sheetsPost('upsert_lanc', { lanc:lanc[i] }); }catch(e){ console.warn('upsert_lanc falhou:', e.message); }
+          try{ await sheetsPost('upsert_lanc', { lanc:lanc[i] }); }catch(e){ console.warn('upsert_lanc falhou:', e?.message||e); }
         }
         leaveEdit();
         alert('Lançamento atualizado.');
       }else{
         const item={id:uid(), of_id, data, fornecedor, materiais, profissionais, ajudantes, almoco:almocoInput, translado, tipo_dia};
         lanc.push(item); persistAll();
-        try{ await sheetsPost('upsert_lanc', { lanc:item }); }catch(e){ console.warn('upsert_lanc falhou:', e.message); }
-        form.reset();
+        try{ await sheetsPost('upsert_lanc', { lanc:item }); }catch(e){ console.warn('upsert_lanc falhou:', e?.message||e); }
+        // limpa apenas campos de valor e mantém a OF para o próximo lançamento
+        q('#data').value='';
+        q('#fornecedor').value='';
+        q('#materiais').value='';
+        q('#profissionais').value=0;
+        q('#ajudantes').value=0;
+        q('#almoco').value='';
+        q('#translado').value='';
+        q('#tipoDia').value='util';
+        bindMoneyFields();
+        ofSel.value = prevOF;
         alert('Lançamento adicionado.');
       }
       ensureFornecedorDatalist();
@@ -597,24 +654,25 @@ document.addEventListener('DOMContentLoaded', () => {
     try{ return JSON.parse(t); }catch{ throw new Error(`GET ${action} JSON inválido: ${t.slice(0,200)}`); }
   }
 
-  // >>>>>>>>>>> CORREÇÃO do POST (sem preflight/CORS) <<<<<<<<<<<<
+  // POST com JSON (mantido)
   async function sheetsPost(action, payload){
     const urlStr = sheetsUrl(); if(!urlStr) throw new Error('Sheets URL vazia');
-    const u = new URL(urlStr); 
+    const u = new URL(urlStr);
     u.searchParams.set('action', action);
     if (sheetsToken()) u.searchParams.set('token', sheetsToken());
-    const fd = new FormData();
-    fd.append('action', action);
-    fd.append('payload', JSON.stringify(payload||{}));
-    const r = await fetch(u.toString(), { method:'POST', body: fd });
+
+    const payloadToSend = { ...payload };
+    delete payloadToSend.token;
+
+    const r = await fetch(u.toString(), {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payloadToSend)
+    });
     const t = await r.text();
     if(!r.ok) throw new Error(`POST ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
-    let js;
-    try{ js = JSON.parse(t); }catch{ throw new Error(`POST ${action} JSON inválido: ${t.slice(0,200)}`); }
-    if(js.ok!==true) throw new Error(js.error||'Falha no servidor');
-    return js;
+    try{ return JSON.parse(t); }catch{ throw new Error(`POST ${action} JSON inválido: ${t.slice(0,200)}`); }
   }
-  // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
   async function testSheetsConnection(){
     const urlStr = sheetsUrl();
@@ -633,7 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }catch(err){ alert('Erro de rede/fetch: ' + (err?.message||err)); }
   }
   async function loadFromSheets(){
-    const res = await sheetsGet('load');
+    const res = await sheetsGet('load'); // espera { ok:true, data:{lancamentos,ofs,fornecedores,cfg} }
     if(!res.ok) throw new Error(res.error || 'Falha ao carregar');
     const d = res.data || {};
     if(d.ofs) ofs = d.ofs;
@@ -644,7 +702,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   async function syncSheets(){
     const payload = { cfg, ofs, fornecedores:sups, lancamentos:lanc };
-    // aceita tanto 'sync_all' quanto 'upsert_all' no backend; usaremos 'sync_all'
     const res = await sheetsPost('sync_all', payload);
     if(!res.ok) throw new Error(res.error || 'Falha ao sincronizar');
     alert('Sincronizado com o Google Sheets!');
@@ -692,4 +749,5 @@ document.addEventListener('DOMContentLoaded', () => {
   fillOFSelects(true);
   ensureFornecedorDatalist();
   bindMoneyFields();
+
 });
