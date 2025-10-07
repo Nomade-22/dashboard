@@ -654,25 +654,37 @@ document.addEventListener('DOMContentLoaded', () => {
     try{ return JSON.parse(t); }catch{ throw new Error(`GET ${action} JSON inválido: ${t.slice(0,200)}`); }
   }
 
-  async function sheetsPost(action, payload){
-    const urlStr = sheetsUrl(); if(!urlStr) throw new Error('Sheets URL vazia');
-    const u = new URL(urlStr); 
-    u.searchParams.set('action', action);
-    if (sheetsToken()) u.searchParams.set('token', sheetsToken());
-    u.searchParams.set('_', Date.now());          // cache-buster
+ // Substitua a função sheetsPost atual por ESTA versão (usa FormData, sem preflight)
+async function sheetsPost(action, payload){
+  const urlStr = sheetsUrl(); 
+  if(!urlStr) throw new Error('Sheets URL vazia');
 
-    const payloadToSend = { ...payload };
-    delete payloadToSend.token;
+  // NÃO coloque action/token na query; envie no corpo (FormData)
+  const u = new URL(urlStr);
+  u.searchParams.set('_', Date.now()); // cache-buster
 
-    const r = await fetch(u.toString(), {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payloadToSend)
-    });
-    const t = await r.text();
-    if(!r.ok) throw new Error(`POST ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
-    try{ return JSON.parse(t); }catch{ throw new Error(`POST ${action} JSON inválido: ${t.slice(0,200)}`); }
+  const fd = new FormData();
+  fd.append('action', action);
+  if (sheetsToken()) fd.append('token', sheetsToken());
+  // o Code.gs já aceita "payload" como JSON em e.parameter.payload
+  fd.append('payload', JSON.stringify(payload || {}));
+
+  const r = await fetch(u.toString(), {
+    method: 'POST',
+    body: fd
+    // ⚠️ Sem headers Content-Type: o browser define multipart/form-data automaticamente
+    // e NÃO faz preflight CORS, evitando o bloqueio.
+  });
+
+  const t = await r.text();
+  if(!r.ok) throw new Error(`POST ${action} HTTP ${r.status}: ${t.slice(0,200)}`);
+  try { 
+    return JSON.parse(t); 
+  } catch {
+    throw new Error(`POST ${action} JSON inválido: ${t.slice(0,200)}`);
   }
+}
+
 
   async function testSheetsConnection(){
     const urlStr = sheetsUrl();
