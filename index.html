@@ -2,237 +2,113 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard — Adequações Civis (v3.3.4)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>Plataforma Multprest</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<header>
-  <div class="title">
-    <h1>Dashboard — Adequações Civis</h1>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">M</div>
+        <div>
+          <h1>Plataforma Multprest</h1>
+          <p>Engenharia, custos e orçamentos</p>
+        </div>
+      </div>
+      <span class="status">Ambiente de integração</span>
+    </header>
+
+    <main class="main-content">
+      <section class="hero">
+        <div>
+          <span class="eyebrow">Central Multprest</span>
+          <h2>Três sistemas, uma única entrada.</h2>
+          <p>Cada módulo continuará com seu próprio design, abas, cálculos e regras de negócio. A integração será feita sem alterar a lógica original dos sistemas.</p>
+        </div>
+      </section>
+
+      <nav class="system-tabs" aria-label="Sistemas principais">
+        <button class="system-tab active" data-system="orcamentos">Orçamentos</button>
+        <button class="system-tab" data-system="calc-hh">Calc HH</button>
+        <button class="system-tab" data-system="precos">Tabela de Preços</button>
+      </nav>
+
+      <section class="system-panel active" id="panel-orcamentos">
+        <div class="panel-head">
+          <div>
+            <span class="module-tag">Sistema 01</span>
+            <h3>Orçamentos</h3>
+            <p>Composição de propostas, BDI por cliente, mão de obra, custos e histórico.</p>
+          </div>
+          <a class="primary-action" href="orcamentos/">Entrar no sistema</a>
+        </div>
+        <div class="module-grid">
+          <div class="module-card"><b>Novo orçamento</b><span>Composição completa por cliente.</span></div>
+          <div class="module-card"><b>Mão de obra</b><span>Tarifas, profissionais e tipos de hora.</span></div>
+          <div class="module-card"><b>BDI</b><span>Condições específicas por cliente/orçamento.</span></div>
+          <div class="module-card"><b>Histórico</b><span>Consulta de propostas e referências anteriores.</span></div>
+        </div>
+      </section>
+
+      <section class="system-panel" id="panel-calc-hh">
+        <div class="panel-head">
+          <div>
+            <span class="module-tag">Sistema 02</span>
+            <h3>Calc HH</h3>
+            <p>Custo real da hora, encargos, custos fixos, margens e formação do HH.</p>
+          </div>
+          <a class="primary-action" href="calc-hh/">Entrar no sistema</a>
+        </div>
+        <div class="module-grid">
+          <div class="module-card"><b>Calculadora HH</b><span>Formação completa do custo por hora.</span></div>
+          <div class="module-card"><b>Cargos</b><span>Funções, salários e parâmetros.</span></div>
+          <div class="module-card"><b>Custos fixos</b><span>Rateios e despesas operacionais.</span></div>
+          <div class="module-card"><b>Configurações</b><span>Parâmetros utilizados nos cálculos.</span></div>
+        </div>
+      </section>
+
+      <section class="system-panel" id="panel-precos">
+        <div class="panel-head">
+          <div>
+            <span class="module-tag">Sistema 03</span>
+            <h3>Tabela de Preços</h3>
+            <p>Materiais, categorias, códigos, referências e apoio à composição de orçamento.</p>
+          </div>
+          <a class="primary-action" href="precos/">Entrar no sistema</a>
+        </div>
+        <div class="module-grid">
+          <div class="module-card"><b>Materiais</b><span>Consulta do banco interno de preços.</span></div>
+          <div class="module-card"><b>Categorias</b><span>Organização e classificação dos itens.</span></div>
+          <div class="module-card"><b>Orçamento</b><span>Seleção e composição de materiais.</span></div>
+          <div class="module-card"><b>Histórico</b><span>Referências e registros existentes.</span></div>
+        </div>
+      </section>
+
+      <section class="roadmap">
+        <div class="roadmap-title">
+          <span class="eyebrow">Ordem de integração</span>
+          <h3>Implantação segura</h3>
+        </div>
+        <ol>
+          <li class="done"><span>1</span><div><b>Portal principal</b><small>Estrutura central com três sistemas.</small></div></li>
+          <li class="current"><span>2</span><div><b>Calc HH</b><small>Primeiro sistema a ser migrado e validado.</small></div></li>
+          <li><span>3</span><div><b>Orçamentos</b><small>Preservando BDI e regras por cliente.</small></div></li>
+          <li><span>4</span><div><b>Tabela de Preços</b><small>Banco de materiais e composição.</small></div></li>
+          <li><span>5</span><div><b>Dashboard sensível</b><small>Será incorporado somente no final.</small></div></li>
+        </ol>
+      </section>
+    </main>
+
+    <footer>
+      <span>Multprest Serviços Industriais</span>
+      <span>Plataforma em desenvolvimento</span>
+    </footer>
   </div>
-  <div class="tabs">
-    <button class="btn" data-tab="dashboard">Dashboard</button>
-    <button class="btn" data-tab="lancamentos">Lançamentos</button>
-    <button class="btn" data-tab="ofs">OFs</button>
-    <button class="btn ghost" data-tab="config">Configurações</button>
-  </div>
-</header>
-
-<main>
-  <!-- DASHBOARD -->
-  <section id="dashboard" class="tab active">
-    <div class="card header-filters">
-      <label class="small">OF selecionada
-        <select id="selOF"></select>
-      </label>
-      <label class="small">De:<input type="date" id="fDe"></label>
-      <label class="small">Até:<input type="date" id="fAte"></label>
-      <label class="small">Fornecedor:<input type="text" id="fFornecedor" placeholder="Filtrar fornecedor"></label>
-      <button class="btn" id="btnFiltrar">Aplicar filtros</button>
-      <button class="btn ghost" id="btnLimpar">Limpar</button>
-      <span class="pill" id="pillOrcado">Orçado: —</span>
-      <span class="pill" id="pillSaldo">Saldo: —</span>
-    </div>
-
-    <div class="kpis">
-      <div class="card kpi">
-        <div class="label">Total Materiais</div>
-        <div class="value" id="kpiMateriais">R$ 0,00</div>
-        <div class="sub" id="kpiItensMat">—</div>
-      </div>
-      <div class="card kpi">
-        <div class="label">Total Mão de Obra</div>
-        <div class="value" id="kpiMO">R$ 0,00</div>
-        <div class="sub" id="kpiHh">—</div>
-      </div>
-      <div class="card kpi">
-        <div class="label">Indiretos (Almoço + Translado)</div>
-        <div class="value" id="kpiIndiretos">R$ 0,00</div>
-        <div class="sub" id="kpiIndPct">—</div>
-      </div>
-      <div class="card kpi">
-        <div class="label">Total Geral</div>
-        <div class="value" id="kpiTotal">R$ 0,00</div>
-        <div class="sub" id="kpiRegistros">—</div>
-      </div>
-      <div class="card kpi">
-        <div class="label">Somente Almoço</div>
-        <div class="value" id="kpiAlmoco">R$ 0,00</div>
-        <div class="sub" id="kpiAlmocoSub">—</div>
-      </div>
-      <div class="card kpi">
-        <div class="label">Somente Translado</div>
-        <div class="value" id="kpiTranslado">R$ 0,00</div>
-        <div class="sub" id="kpiTransladoSub">—</div>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="card"><div class="chart-wrap"><canvas id="graficoEvolucao"></canvas></div></div>
-      <div class="card"><div class="chart-wrap"><canvas id="graficoCategorias"></canvas></div></div>
-      <div class="card" style="grid-column:1 / -1">
-        <div class="chart-wrap"><canvas id="graficoFornecedores"></canvas></div>
-      </div>
-
-      <div class="card" style="grid-column:1 / -1">
-        <div class="toolbar">
-          <button class="btn" id="btnExportPDF">Exportar PDF</button>
-          <button class="btn" id="btnExportar">Exportar CSV</button>
-          <label class="btn ghost" for="inputCSV">Importar CSV</label>
-          <input id="inputCSV" type="file" accept=".csv" style="display:none">
-          <span class="muted">CSV: of_id,data,fornecedor,materiais,profissionais,ajudantes,almoco,translado,tipo_dia</span>
-        </div>
-        <div class="table-wrap">
-          <table id="tabela">
-            <thead>
-              <tr>
-                <th>OF</th><th>Data</th><th>Fornecedor</th>
-                <th>Materiais</th><th>Profissionais</th><th>Ajudantes</th>
-                <th>Almoço</th><th>Translado</th><th>Total</th><th></th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- LANÇAMENTOS -->
-  <section id="lancamentos" class="tab">
-    <div class="two-col">
-      <div class="card">
-        <h3 id="formTitle">Novo Lançamento</h3>
-        <form id="form" class="form">
-          <input type="hidden" id="editId">
-          <label class="small">OF
-            <select id="ofId" required></select>
-          </label>
-          <label class="small">Data<input type="date" id="data" required></label>
-          <label class="small">Fornecedor<input type="text" id="fornecedor" placeholder="Ex.: Bortolaso"></label>
-          <label class="small">Materiais (R$)<input id="materiais" class="money"></label>
-          <div class="row2">
-            <label class="small">Profissionais (qtd)<input type="number" id="profissionais" step="1" min="0"></label>
-            <label class="small">Ajudantes (qtd)<input type="number" id="ajudantes" step="1" min="0"></label>
-          </div>
-          <div class="row2">
-            <label class="small">Almoço (R$)<input id="almoco" class="money"></label>
-            <label class="small">Translado (R$)<input id="translado" class="money"></label>
-          </div>
-          <div class="row2">
-            <label class="small">Tipo de dia
-              <select id="tipoDia">
-                <option value="util">Dia útil</option>
-                <option value="sabado">Sábado (+50%)</option>
-                <option value="domingo">Domingo/Feriado (+100%)</option>
-              </select>
-            </label>
-          </div>
-          <div class="btns">
-            <button class="btn primary" type="submit" id="btnSalvarLanc">Adicionar</button>
-            <button class="btn ghost" type="reset" id="btnCancelarEdit" style="display:none">Cancelar edição</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card">
-        <h3>Ajuda</h3>
-        <ul class="muted">
-          <li>Cadastre as <b>OFs</b> primeiro (aba OFs). Cada OF é um <b>centro de custo</b>.</li>
-          <li>Selecione a OF na hora de lançar uma despesa.</li>
-          <li>Dashboard mostra o <b>saldo</b> da OF selecionada.</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- OFs -->
-  <section id="ofs" class="tab">
-    <div class="two-col">
-      <div class="card">
-        <h3>Cadastrar OF</h3>
-        <form id="formOF" class="form">
-          <label class="small">Nº/ID da OF<input type="text" id="ofNumero" required></label>
-          <label class="small">Cliente<input type="text" id="ofCliente"></label>
-          <label class="small">Orçamento (R$)<input id="ofOrcado" class="money"></label>
-          <label class="small">Descrição<textarea id="ofDesc"></textarea></label>
-          <div class="btns">
-            <button class="btn primary" type="submit">Salvar OF</button>
-            <button class="btn" id="btnResetOFs" type="button">Apagar todas OFs</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card">
-        <h3>OFs cadastradas</h3>
-        <div class="of-grid" id="ofCards"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CONFIG -->
-  <section id="config" class="tab">
-    <div class="card" style="max-width:900px">
-      <h3>Configurações</h3>
-      <div class="form">
-        <div class="row2">
-          <label class="small">R$/dia Profissional
-            <input id="cfgProf" class="money">
-          </label>
-          <label class="small">R$/dia Ajudante
-            <input id="cfgAjud" class="money">
-          </label>
-        </div>
-        <div class="row2">
-          <label class="small">R$/almoço (por pessoa)
-            <input id="cfgAlmoco" class="money">
-          </label>
-          <label class="small">Modo do almoço
-            <select id="cfgAlmocoMode">
-              <option value="por_pessoa">Por pessoa</option>
-              <option value="qtd">Quantidade de dias (qtd × pessoas × R$)</option>
-              <option value="valor">Valor total (R$) lançado</option>
-            </select>
-          </label>
-        </div>
-        <div class="row2">
-          <label class="small">Multiplicador sábado (ex.: 1,5)
-            <input type="number" step="0.01" min="0" id="cfgMultSab">
-          </label>
-          <label class="small">Multiplicador domingo/feriado (ex.: 2,0)
-            <input type="number" step="0.01" min="0" id="cfgMultDom">
-          </label>
-        </div>
-
-        <h4 class="muted" style="margin-top:8px">Integração Google Sheets</h4>
-        <div class="row2">
-          <label class="small">Sheets Web App URL
-            <input id="cfgSheetsUrl" placeholder="https://script.google.com/macros/s/.../exec">
-          </label>
-          <label class="small">Sheets API Token (opcional)
-            <input id="cfgSheetsToken" placeholder="se configurado no Apps Script">
-          </label>
-        </div>
-
-        <div class="btns">
-          <button class="btn primary" id="btnSalvarCfg" type="button">Salvar</button>
-          <button class="btn" id="btnLoadSheets" type="button">Carregar do Sheets</button>
-          <button class="btn" id="btnSyncSheets" type="button">Sincronizar Sheets</button>
-          <button class="btn ghost" id="btnTestSheets" type="button">Testar conexão</button>
-        </div>
-        <p class="muted">Cole a URL do Web App (termina com <code>/exec</code>). “Carregar do Sheets” traz dados para o app. “Sincronizar Sheets” envia tudo.</p>
-      </div>
-    </div>
-  </section>
-</main>
-
-<datalist id="fornList"></datalist>
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
