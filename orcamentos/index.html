@@ -36,6 +36,46 @@
       <button data-tab="custos-hh">$ Custos HH</button>
     </nav>
 
+    <section class="tab-panel" id="tab-mao-de-obra">
+      <div class="page-title">
+        <div><span class="eyebrow">Composição de equipe</span><h2>Mão de Obra</h2><p>Regra preservada do sistema original: tarifa base do profissional por cliente × multiplicador do tipo de hora × horas × pessoas × dias.</p></div>
+        <div class="title-actions"><button class="btn ghost" id="btnExportRates">Exportar tabela</button><label class="btn ghost file-btn" for="inputRates">Importar tabela</label><input id="inputRates" type="file" accept=".csv,.json" hidden><button class="btn" id="btnAddLabor">+ Adicionar Mão de Obra</button></div>
+      </div>
+
+      <div class="labor-kpis">
+        <div class="kpi blue"><span>Itens</span><strong id="laborKpiItens">1</strong></div>
+        <div class="kpi amber"><span>HH Total</span><strong id="laborKpiHH">0,00 HH</strong></div>
+        <div class="kpi purple"><span>Pessoas somadas</span><strong id="laborKpiPessoas">0</strong></div>
+        <div class="kpi green"><span>Total Venda</span><strong id="laborKpiTotal">R$ 0,00</strong></div>
+      </div>
+
+      <section class="card labor-rate-card">
+        <div class="card-title actions-title">
+          <div><h3>Tabela de Preços (R$/hora)</h3><p>As taxas são específicas por Profissional + Cliente. Os tipos de hora aplicam multiplicadores sobre esta taxa base.</p></div>
+          <div><button class="btn ghost" id="btnResetRates">↻ Zerar taxas locais</button><button class="btn" id="btnSaveRates">Salvar tabela neste navegador</button></div>
+        </div>
+        <div class="warning-box compact"><b>Segurança:</b> a base de produção não está escrita no código público desta branch. Para testes, importe sua tabela local ou preencha os valores; depois conectaremos a API privada.</div>
+        <div class="rate-table-wrap"><table class="rate-table" id="laborRateTable"></table></div>
+      </section>
+
+      <div class="labor-toolbar"><button class="btn ghost danger" id="btnResetLabor">↻ Zerar itens</button><button class="btn" id="btnAddLabor2">+ Adicionar Mão de Obra</button></div>
+      <div id="laborItems" class="labor-items"></div>
+
+      <div class="labor-summary-grid">
+        <section class="card">
+          <div class="card-title"><h3>Resumo por Profissional</h3></div>
+          <div id="laborByWorker" class="breakdown"></div>
+          <div class="labor-grand"><span>Total Geral</span><strong id="laborGrandTotal">R$ 0,00</strong></div>
+        </section>
+        <section class="card detail-card">
+          <div class="card-title"><h3>Detalhamento Geral</h3></div>
+          <div class="team-row"><label>Pessoas por equipe (máx. por dia)<input id="teamSize" type="number" min="1" max="9" value="5"></label><div><span>Dias de equipe necessários</span><strong id="teamDays">0 dias</strong><small id="teamCalc">0 pessoas ÷ 5 por equipe</small></div></div>
+          <div class="detail-grid"><div><span>Total Pessoas</span><strong id="detailPeople">0</strong></div><div><span>Total Dias</span><strong id="detailDays">0</strong></div></div>
+          <div class="hours-title">Horas por Tipo</div><div id="hoursByType" class="hours-list"></div>
+        </section>
+      </div>
+    </section>
+
     <section class="tab-panel active" id="tab-bdi">
       <div class="page-title">
         <div><span class="eyebrow">Formação de preço</span><h2>BDI por cliente</h2><p>Cada cliente mantém seu próprio prazo e pode manter seus próprios percentuais comerciais. O cálculo respeita a fórmula do sistema original.</p></div>
@@ -43,9 +83,7 @@
       </div>
 
       <div class="client-bar card">
-        <label>Cliente do perfil
-          <select id="perfilCliente"></select>
-        </label>
+        <label>Cliente do perfil<select id="perfilCliente"></select></label>
         <div class="client-info"><span>Prazo cadastrado</span><strong id="perfilDias">—</strong></div>
         <div class="client-info"><span>BDI calculado</span><strong id="perfilBdi">0,00%</strong></div>
         <button class="btn" id="btnSalvarPerfil">Salvar perfil deste cliente</button>
@@ -88,7 +126,6 @@
       </section>
     </section>
 
-    <section class="tab-panel placeholder" id="tab-mao-de-obra"><h2>Mão de Obra</h2><p>Próximo módulo: tarifas por cliente, profissional e tipo de hora serão migradas do banco original.</p></section>
     <section class="tab-panel placeholder" id="tab-despesas"><h2>Despesas</h2><p>Hospedagem, transporte, almoço, janta e café serão preservados.</p></section>
     <section class="tab-panel placeholder" id="tab-viagens"><h2>Viagens</h2><p>Rotas, tempo, distância e pessoa-horas serão integrados após a API de rotas.</p></section>
     <section class="tab-panel placeholder" id="tab-nota-reversa"><h2>Nota Reversa</h2><p>Em migração.</p></section>
