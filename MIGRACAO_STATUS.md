@@ -42,7 +42,12 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 - [x] Material pode utilizar o perfil do próprio cliente
 - [x] Fórmula `Preço = Custo / (1 - soma dos percentuais)` preservada
 - [x] Juros compostos por prazo preservados
-- [ ] Mão de Obra
+- [x] Mão de Obra
+- [x] Regra `Cliente + Profissional + Tipo de Hora = tarifa` preservada
+- [x] Multiplicadores Normal / 50% / 100% / 120% preservados
+- [x] Fórmula de venda `tarifa × multiplicador × horas × pessoas × dias` preservada
+- [x] HH, resumo por profissional e detalhamento de equipe implementados
+- [x] Tabela HH editável com importação/exportação local
 - [ ] Despesas
 - [ ] Viagens
 - [ ] Nota Reversa
@@ -52,10 +57,13 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 - [ ] Tabela de Preços interna
 - [ ] Custos HH integrados
 - [ ] Autenticação e usuários
-- [ ] Banco remoto
+- [ ] Banco remoto / API privada
 
 ### Regra crítica de BDI
 Não existe um único BDI obrigatório para todos os clientes. A plataforma deve manter perfil e prazo por cliente. Valores default são apenas ponto de partida e não substituem configurações comerciais confirmadas.
+
+### Segurança da tabela de Mão de Obra
+O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Por isso, as tarifas comerciais de produção não devem ser gravadas no código-fonte público. Nesta etapa, a tabela de HH fica no navegador do usuário (`localStorage`) e pode ser importada por CSV/JSON. Na etapa de produção, a base real deverá vir de uma API/banco privado com autenticação.
 
 ## 4. Tabela de Preços
 - [ ] Migração ainda não iniciada
