@@ -57,7 +57,12 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 - [x] KM total e número de viagens disponibilizados para a aba Despesas
 - [x] Contrato da API `/api/calculate-route` preservado
 - [ ] Backend privado da rota com OpenRouteService
-- [ ] Despesas
+- [x] Despesas — Estadia, Transporte, Almoço, Janta e Café
+- [x] BDI da despesa calculado pelo cliente selecionado
+- [x] Transporte conectado ao KM total e nº de viagens de Horas Viajadas
+- [x] Transporte permite alternar entre dados automáticos e KM/viagens manuais
+- [x] Combustível por `R$/litro ÷ km/l`, pedágio por viagem e valor final com BDI preservados
+- [x] Totais de despesas disponibilizados para o futuro Resumo Final
 - [ ] Nota Reversa
 - [ ] Negociação
 - [ ] Resumo Final
@@ -75,6 +80,9 @@ O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Por isso, 
 
 ### Busca de rotas
 O sistema original usa OpenRouteService: geocodifica Origem e Destino limitando a busca ao Brasil e depois calcula a rota `driving-car`. A chave `OPENROUTE_API_KEY` deve permanecer apenas no backend privado. Nunca inserir essa chave em `config.js`, `viagens.js` ou qualquer arquivo do GitHub Pages. A interface está pronta para consumir o mesmo retorno do endpoint original: endereço resolvido, distância em km e duração em minutos.
+
+### Despesas
+A lógica preservada segue o comportamento observado no sistema original: Estadia/Alimentação usam custo unitário por pessoa por dia e aplicam o BDI do cliente; Transporte usa distância, consumo do veículo, preço do combustível, pedágio e quantidade de viagens. Quando a fonte é `Horas Viajadas`, o KM total já vem consolidado da rota e o pedágio é multiplicado pelo número de viagens. O modo manual continua disponível como alternativa.
 
 ## 4. Tabela de Preços
 - [ ] Migração ainda não iniciada
