@@ -78,7 +78,12 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 - [x] Recalcular antecipação sobre o novo líquido após impostos
 - [x] Manter custos reais deduzidos durante a negociação
 - [x] Mostrar lucro/prejuízo, margem final, perda de lucro e % do lucro perdido
-- [ ] Resumo Final
+- [x] Resumo Final
+- [x] Preço Final Total consolidado conforme Dashboard original
+- [x] Lucro Final e percentual vindos da Nota Reversa
+- [x] Cards de Mão de Obra, Material, Despesas de Viagem, Estadia, Transporte, Alimentação e Horas Viajadas
+- [x] Detalhamento completo e subtotal de alimentação
+- [x] Distribuição percentual de custos preservada
 - [ ] Histórico
 - [ ] Tabela de Preços interna
 - [ ] Custos HH integrados
@@ -102,6 +107,9 @@ A lógica original foi preservada: ISSQN = 5% do bruto quando ativo; INSS = 11%;
 
 ### Negociação
 A negociação recebe uma fotografia dos valores da Nota Reversa. Ao aplicar desconto percentual ou fixo, o sistema cria o novo valor bruto, recalcula os impostos ativos e a antecipação, mantém os custos selecionados e calcula o lucro final. Também mostra o impacto do desconto e alerta se a proposta passa a gerar prejuízo.
+
+### Resumo Final
+Mantém a consolidação do `Dashboard.tsx` original: `Preço Final Total = Mão de Obra + Material + Estadia + Transporte + Almoço + Janta + Café + Horas Viajadas`. `Despesas de Viagem` é exibido também como subtotal visual, sem ser somado novamente no total geral. O Lucro Final continua sendo o resultado da Nota Reversa, como no sistema original.
 
 ## 4. Tabela de Preços
 - [ ] Migração ainda não iniciada
