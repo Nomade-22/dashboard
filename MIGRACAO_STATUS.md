@@ -60,11 +60,24 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 - [x] Despesas — Estadia, Transporte, Almoço, Janta e Café
 - [x] BDI da despesa calculado pelo cliente selecionado
 - [x] Transporte conectado ao KM total e nº de viagens de Horas Viajadas
-- [x] Transporte permite alternar entre dados automáticos e KM/viagens manuais
-- [x] Combustível por `R$/litro ÷ km/l`, pedágio por viagem e valor final com BDI preservados
-- [x] Totais de despesas disponibilizados para o futuro Resumo Final
-- [ ] Nota Reversa
-- [ ] Negociação
+- [x] Transporte permite dados automáticos ou KM/viagens manuais
+- [x] Fórmula original do transporte preservada: `(KM × R$/km + pedágio) × viagens`
+- [x] Totais com BDI e totais sem BDI separados para cálculos posteriores
+- [x] Nota Reversa
+- [x] ISSQN 5%, INSS 11% e Simples 14% conforme código original da Nota Reversa
+- [x] Antecipação calculada sobre o líquido após os demais impostos
+- [x] Dedução seletiva dos custos reais sem BDI
+- [x] Mão de Obra e Horas Viajadas usam custo interno HH, não tarifa de venda
+- [x] Custos internos HH mantidos fora do GitHub público e importáveis localmente
+- [x] Valor líquido final, % descontos e lucro preservados
+- [x] Negociação
+- [x] Puxar valores e composição da Nota Reversa
+- [x] Desconto por porcentagem ou valor fixo
+- [x] Botões rápidos 5%, 10%, 15%, 20%, 25% e 30%
+- [x] Recalcular impostos sobre o novo valor bruto após desconto
+- [x] Recalcular antecipação sobre o novo líquido após impostos
+- [x] Manter custos reais deduzidos durante a negociação
+- [x] Mostrar lucro/prejuízo, margem final, perda de lucro e % do lucro perdido
 - [ ] Resumo Final
 - [ ] Histórico
 - [ ] Tabela de Preços interna
@@ -75,14 +88,20 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 ### Regra crítica de BDI
 Não existe um único BDI obrigatório para todos os clientes. A plataforma deve manter perfil e prazo por cliente. Valores default são apenas ponto de partida e não substituem configurações comerciais confirmadas.
 
-### Segurança da tabela de Mão de Obra
-O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Por isso, as tarifas comerciais de produção não devem ser gravadas no código-fonte público. Nesta etapa, a tabela de HH fica no navegador do usuário (`localStorage`) e pode ser importada por CSV/JSON. Na etapa de produção, a base real deverá vir de uma API/banco privado com autenticação.
+### Segurança da tabela de Mão de Obra e custos internos
+O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Por isso, tarifas comerciais de produção, custos internos HH, credenciais e chaves não devem ser gravados no código-fonte público. Nesta etapa, essas bases ficam no navegador do usuário (`localStorage`) e podem ser importadas por arquivos privados. Na etapa de produção, deverão vir de API/banco privado com autenticação.
 
 ### Busca de rotas
 O sistema original usa OpenRouteService: geocodifica Origem e Destino limitando a busca ao Brasil e depois calcula a rota `driving-car`. A chave `OPENROUTE_API_KEY` deve permanecer apenas no backend privado. Nunca inserir essa chave em `config.js`, `viagens.js` ou qualquer arquivo do GitHub Pages. A interface está pronta para consumir o mesmo retorno do endpoint original: endereço resolvido, distância em km e duração em minutos.
 
 ### Despesas
-A lógica preservada segue o comportamento observado no sistema original: Estadia/Alimentação usam custo unitário por pessoa por dia e aplicam o BDI do cliente; Transporte usa distância, consumo do veículo, preço do combustível, pedágio e quantidade de viagens. Quando a fonte é `Horas Viajadas`, o KM total já vem consolidado da rota e o pedágio é multiplicado pelo número de viagens. O modo manual continua disponível como alternativa.
+A lógica segue o código original. Estadia/Alimentação usam custo unitário por pessoa por dia e aplicam BDI do cliente. Transporte utiliza `useKm = KM manual ou totalKm de Horas Viajadas`, `useViagens = viagens manuais ou totalViagens`, `R$/km = combustível ÷ km/l` e `base = (useKm × R$/km + pedágio) × useViagens`, aplicando depois o BDI do cliente. Os valores crus sem BDI são preservados separadamente para Nota Reversa.
+
+### Nota Reversa
+A lógica original foi preservada: ISSQN = 5% do bruto quando ativo; INSS = 11%; Simples = 14%; antecipação incide sobre o líquido após esses impostos. Em seguida, somente os custos marcados pelo usuário são deduzidos pelos valores sem BDI. `Valor Líquido Final = líquido após antecipação - custos selecionados`.
+
+### Negociação
+A negociação recebe uma fotografia dos valores da Nota Reversa. Ao aplicar desconto percentual ou fixo, o sistema cria o novo valor bruto, recalcula os impostos ativos e a antecipação, mantém os custos selecionados e calcula o lucro final. Também mostra o impacto do desconto e alerta se a proposta passa a gerar prejuízo.
 
 ## 4. Tabela de Preços
 - [ ] Migração ainda não iniciada
