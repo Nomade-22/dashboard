@@ -48,8 +48,16 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 - [x] Fórmula de venda `tarifa × multiplicador × horas × pessoas × dias` preservada
 - [x] HH, resumo por profissional e detalhamento de equipe implementados
 - [x] Tabela HH editável com importação/exportação local
+- [x] Horas Viajadas — interface e cálculos migrados
+- [x] Origem e Destino por cidade/estado preservados
+- [x] Ida / Ida e Volta preservados
+- [x] Horas automáticas ou manuais preservadas
+- [x] Regra `Pagar todos / Limite de horas` preservada
+- [x] Distância total, tempo total, tempo pago, pessoa-horas e custo preservados
+- [x] KM total e número de viagens disponibilizados para a aba Despesas
+- [x] Contrato da API `/api/calculate-route` preservado
+- [ ] Backend privado da rota com OpenRouteService
 - [ ] Despesas
-- [ ] Viagens
 - [ ] Nota Reversa
 - [ ] Negociação
 - [ ] Resumo Final
@@ -64,6 +72,9 @@ Não existe um único BDI obrigatório para todos os clientes. A plataforma deve
 
 ### Segurança da tabela de Mão de Obra
 O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Por isso, as tarifas comerciais de produção não devem ser gravadas no código-fonte público. Nesta etapa, a tabela de HH fica no navegador do usuário (`localStorage`) e pode ser importada por CSV/JSON. Na etapa de produção, a base real deverá vir de uma API/banco privado com autenticação.
+
+### Busca de rotas
+O sistema original usa OpenRouteService: geocodifica Origem e Destino limitando a busca ao Brasil e depois calcula a rota `driving-car`. A chave `OPENROUTE_API_KEY` deve permanecer apenas no backend privado. Nunca inserir essa chave em `config.js`, `viagens.js` ou qualquer arquivo do GitHub Pages. A interface está pronta para consumir o mesmo retorno do endpoint original: endereço resolvido, distância em km e duração em minutos.
 
 ## 4. Tabela de Preços
 - [ ] Migração ainda não iniciada
