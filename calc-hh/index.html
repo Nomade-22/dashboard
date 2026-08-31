@@ -1,1 +1,169 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Calc HH — Plataforma Multprest</title><style>body{margin:0;font-family:Inter,Arial,sans-serif;background:#080d18;color:#edf3fb;min-height:100vh;display:grid;place-items:center}.box{width:min(680px,calc(100% - 32px));border:1px solid #243248;background:#101827;border-radius:20px;padding:30px;box-shadow:0 25px 70px rgba(0,0,0,.3)}a{color:#7db1ff;text-decoration:none;font-weight:700}.tag{font-size:12px;color:#7db1ff;text-transform:uppercase;font-weight:800;letter-spacing:.12em}h1{margin:10px 0}p{color:#94a3b8;line-height:1.65}</style></head><body><main class="box"><span class="tag">Sistema 02</span><h1>Calc HH</h1><p>Área preparada para receber o sistema original. A migração será feita preservando o design, os cálculos e as regras já existentes no código.</p><p>Próxima etapa: migrar a interface e conectar as funções do Calc HH.</p><a href="../#calc-hh">← Voltar à Plataforma Multprest</a></main></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#07111f" />
+  <title>Calculadora HH — Multprest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-wrap">
+        <a href="../" class="back-link" aria-label="Voltar à plataforma">←</a>
+        <img src="https://dtvoeevhaseb5.cloudfront.net/uploads/mocha-import/63a2001d-676d-47d6-a98d-4e0843dd6483/740dd49d-617b-4e52-943b-d4e595105ea8.png" alt="Multprest" class="brand-logo" />
+        <div>
+          <h1>Calculadora HH</h1>
+          <p>Custo de Funcionário</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn secondary" id="btnExportTxt">Exportar TXT</button>
+        <button class="btn secondary" id="btnExportCsv">Exportar CSV</button>
+        <button class="icon-btn" id="btnReset" title="Resetar">↻</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <nav class="tabs main-tabs" aria-label="Abas do Calc HH">
+      <button class="tab-btn active" data-tab="calculadora">▣ Calculadora</button>
+      <button class="tab-btn" data-tab="tabela">▦ Tabela de Valores</button>
+      <button class="tab-btn" data-tab="custo-fixo">▤ Custo Fixo</button>
+    </nav>
+
+    <section class="tab-panel active" id="tab-calculadora">
+      <div class="cargo-area">
+        <div class="cargo-title-row">
+          <span class="muted">Cargo:</span>
+          <button class="link-btn hidden" id="btnLimparCargo">Limpar seleção</button>
+        </div>
+        <div class="cargo-list" id="cargoList"></div>
+        <p class="cargo-note hidden" id="cargoNote">💡 O salário do cargo vem do cadastro atual. Você pode editar qualquer campo abaixo.</p>
+      </div>
+
+      <div class="columns-3">
+        <div class="stack">
+          <section class="card">
+            <h2>Informações Básicas</h2>
+            <div class="fields">
+              <label>Salário Base <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="salario"></div></label>
+              <label>Jornada Mensal <div class="input-wrap"><input type="number" step="1" data-field="jornada"><span>hrs</span></div></label>
+              <label>Salário Mínimo (referência) <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="salarioMinimo"></div></label>
+            </div>
+            <button class="btn block" id="btnSalvarBasico">Salvar Valores</button>
+          </section>
+
+          <section class="card">
+            <h2>Benefícios</h2>
+            <div class="fields">
+              <label>Prêmio Assiduidade <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="premioAssiduidade"></div></label>
+              <label>Insalubridade <div class="input-wrap"><input type="number" step="0.01" max="40" data-field="insalubridadePerc"><span>%</span></div></label>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Custos Fixos Individuais</h2>
+            <div class="fields grid-2">
+              <label>Almoço <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="almoco"></div></label>
+              <label>EPI / Uniformes <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="epi"></div></label>
+              <label>Transporte <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="transporte"></div></label>
+              <label>Exames <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="exames"></div></label>
+            </div>
+            <div class="fields">
+              <label>Ferramentas <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="ferramentas"></div></label>
+              <label>Plano de Saúde <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="planoSaude"></div></label>
+              <label>Treinamentos NR (anual) <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="treinamentosAnual"></div></label>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Seguro de Vida</h2>
+            <div class="fields"><label>Valor Total do Seguro <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="seguroVidaTotal"></div></label></div>
+            <p class="tiny" id="seguroRateio"></p>
+          </section>
+        </div>
+
+        <div class="stack">
+          <section class="card">
+            <h2>Custos Operacionais</h2>
+            <div class="fields">
+              <label>Custo Operacional Total <div class="input-wrap"><span>R$</span><input type="number" step="0.01" data-field="custoOperacional"></div></label>
+              <label>Quantidade de Funcionários <div class="input-wrap"><input type="number" step="1" min="1" data-field="qtdFunc"></div></label>
+            </div>
+            <button class="btn block" id="btnSalvarOperacional">Salvar Valores</button>
+          </section>
+
+          <section class="card">
+            <h2>Encargos e Impostos</h2>
+            <div class="fields">
+              <label>INSS Patronal <div class="input-wrap"><input type="number" step="0.01" data-field="inssPatronalPerc"><span>%</span></div></label>
+              <label>INSS Prestador <div class="input-wrap"><input type="number" step="0.01" data-field="inssPrestadorPerc"><span>%</span></div></label>
+              <label>Simples Nacional <div class="input-wrap"><input type="number" step="0.01" data-field="simplesPerc"><span>%</span></div></label>
+              <label>ISSQN <div class="input-wrap"><input type="number" step="0.01" data-field="issqnPerc"><span>%</span></div></label>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Lucro e Antecipação</h2>
+            <div class="fields">
+              <label>Margem de Lucro <div class="input-wrap"><input type="number" step="0.01" data-field="lucroPerc"><span>%</span></div></label>
+              <label>Dias para Antecipação <div class="input-wrap"><input type="number" step="1" data-field="diasAntecipacao"><span>dias</span></div></label>
+            </div>
+            <div class="mini-result"><span>Margem Antecipação:</span><strong id="margemAntecipacao">0,0%</strong><small>0,1% ao dia (3% ao mês)</small></div>
+            <div class="divider"></div>
+            <div class="fields"><label>Margem Negociação <div class="input-wrap"><input type="number" step="0.01" data-field="descontoNegociacaoPerc"><span>%</span></div></label></div>
+            <div class="mini-result green">
+              <div><span>Margem em R$:</span><strong id="margemNegociacaoValor">R$ 0,00</strong></div>
+              <div><span>Preço p/ oferecer:</span><strong id="precoComMargemMini">R$ 0,00</strong></div>
+              <div><span>Valor hora c/ margem:</span><strong id="valorHoraMargemMini">R$ 0,00</strong></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="stack">
+          <section class="card result-card"><h2>Encargos Trabalhistas</h2><div id="encargosResults" class="result-list"></div><p class="result-foot" id="percentualEncargos"></p></section>
+          <section class="card result-card"><h2>Custos Adicionais</h2><div id="custosResults" class="result-list"></div></section>
+          <section class="card highlight-card"><h2>Resultado Final</h2><div class="result-list" id="finalResults"></div><div class="offer-box" id="offerBox"></div></section>
+        </div>
+      </div>
+
+      <section class="hour-composition">
+        <div class="composition-card wide"><h3>Composição por Hora (<span id="jornadaLabel">220</span>h/mês)</h3><div class="composition-grid" id="compositionGrid"></div></div>
+        <div class="hour-card"><span>Valor Hora</span><strong id="valorHoraBig">R$ 0,00</strong><small id="valorHoraAntecipacaoBig">Com antecipação: R$ 0,00</small><div class="hour-margin"><span>Com margem</span><b id="valorHoraMargemBig">R$ 0,00</b></div></div>
+      </section>
+
+      <section class="proof-grid">
+        <div class="card"><h2>Prova Real — Preço Final</h2><div id="reversoResults" class="result-list"></div><div class="proof-status" id="proofStatus"></div></div>
+        <div class="card"><h2>Prova Real — Preço com Margem</h2><div id="reversoMargemResults" class="result-list"></div></div>
+      </section>
+    </section>
+
+    <section class="tab-panel" id="tab-tabela">
+      <section class="card table-card">
+        <h2>Tabela de Valores por Empresa</h2>
+        <p class="muted">Valores de hora-homem por cargo e empresa, considerando os dias de antecipação específicos de cada cliente, conforme o sistema original.</p>
+        <div class="table-wrap"><table id="empresaTable"></table></div>
+        <p class="tiny center">Valores calculados com margem de negociação de 12%. Dias de antecipação conforme cada empresa.</p>
+      </section>
+    </section>
+
+    <section class="tab-panel" id="tab-custo-fixo">
+      <div class="cost-actions"><button class="btn secondary" id="btnAddCusto">+ Adicionar Item</button><button class="btn secondary" id="btnResetCustos">↻ Resetar</button></div>
+      <section class="card"><h2>Itens de Custo Fixo</h2><div class="cost-head"><span>Descrição</span><span>Valor (R$)</span><span></span></div><div id="custosFixosList"></div></section>
+      <div class="cost-total-grid">
+        <section class="card result-card total-center"><span>Total Custo Fixo</span><strong id="totalCustoFixo">R$ 0,00</strong><small>Soma de todos os itens</small></section>
+        <section class="card highlight-card total-center"><span>Custo por Funcionário</span><strong id="custoFixoFunc">R$ 0,00</strong><small id="custoFixoFuncLabel"></small></section>
+      </div>
+      <div class="info-box"><b>Dica:</b> O valor de “Custo por Funcionário” pode ser usado como base para o campo “Custo Operacional Total” na aba Calculadora.</div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
