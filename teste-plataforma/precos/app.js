@@ -3,7 +3,7 @@
   const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
   const num=v=>Number.isFinite(Number(v))?Number(v):0;
   const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(num(v));
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const parse=(s,f)=>{try{return s?JSON.parse(s):structuredClone(f)}catch{return structuredClone(f)}};
   const toast=m=>{const e=$('#toast');e.textContent=m;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),1800)};
 
@@ -21,7 +21,7 @@
   const subs=c=>[...new Set(materials.filter(m=>!c||catName(m)===c).map(subName).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
 
   function filtered(){const q=norm($('#searchMaterial').value).toLowerCase(),s=norm($('#searchSupplier').value).toLowerCase(),c=$('#filterCategory').value,sc=$('#filterSubcategory').value;return materials.filter(m=>(!q||norm(m.name).toLowerCase().includes(q))&&(!s||norm(m.supplier).toLowerCase().includes(s))&&(!c||catName(m)===c)&&(!sc||subName(m)===sc))}
-  function grand(list=filtered()){return list.reduce((a,m)=>a+num(m.price)*num(quantities[m.id]),0)}
+  function grand(list=materials){return list.reduce((a,m)=>a+num(m.price)*num(quantities[m.id]),0)}
   function renderFilters(){
     const c=$('#filterCategory').value, sc=$('#filterSubcategory').value;
     $('#filterCategory').innerHTML='<option value="">Todas as categorias</option>'+cats().map(x=>`<option ${x===c?'selected':''}>${esc(x)}</option>`).join('');
@@ -29,7 +29,7 @@
     $('#categoryList').innerHTML=cats().map(x=>`<option value="${esc(x)}"></option>`).join('');$('#subcategoryList').innerHTML=subs('').map(x=>`<option value="${esc(x)}"></option>`).join('');
     const chips=[];if($('#searchMaterial').value)chips.push(['Busca: '+$('#searchMaterial').value,'searchMaterial']);if($('#searchSupplier').value)chips.push(['Fornecedor: '+$('#searchSupplier').value,'searchSupplier']);if(c)chips.push([c,'filterCategory']);if(sc)chips.push([sc,'filterSubcategory']);$('#activeFilters').innerHTML=chips.map(([t,k])=>`<button class="chip" data-clear="${k}">${esc(t)} ×</button>`).join('');$$('[data-clear]').forEach(b=>b.onclick=()=>{const el=$('#'+b.dataset.clear);el.value='';if(b.dataset.clear==='filterCategory')$('#filterSubcategory').value='';renderAll()});
   }
-  function renderTable(){const list=filtered();$('#statCount').textContent=list.length;$('#visibleCount').textContent=`${list.length} exibidos`;$('#statTotal').textContent=money(grand(list));$('#emptyState').classList.toggle('hidden',list.length>0);$('#materialsBody').innerHTML=list.map(m=>`<tr data-id="${m.id}"><td><div class="mat-name">${esc(m.name)}</div></td><td>${catName(m)?esc(catName(m)):'<span class="muted">-</span>'}</td><td><span class="muted">${subName(m)?esc(subName(m)):'-'}</span></td><td><span class="muted">${esc(m.supplier||'-')}</span></td><td>${esc(m.unit||'-')}</td><td class="price">${money(m.price)}</td><td><input class="qty" type="number" min="0" step="0.01" value="${num(quantities[m.id])||''}" placeholder="0"></td><td class="row-total">${num(quantities[m.id])?money(num(m.price)*num(quantities[m.id])):'-'}</td><td><div class="row-actions"><button class="action send">＋ Orçamento</button><button class="action edit">Editar</button><button class="action del">Excluir</button></div></td></tr>`).join('');
+  function renderTable(){const list=filtered();$('#statCount').textContent=materials.length;$('#visibleCount').textContent=`${list.length} exibidos`;$('#statTotal').textContent=money(grand(materials));$('#emptyState').classList.toggle('hidden',list.length>0);$('#materialsBody').innerHTML=list.map(m=>`<tr data-id="${m.id}"><td><div class="mat-name">${esc(m.name)}</div></td><td>${catName(m)?esc(catName(m)):'<span class="muted">-</span>'}</td><td><span class="muted">${subName(m)?esc(subName(m)):'-'}</span></td><td><span class="muted">${esc(m.supplier||'-')}</span></td><td>${esc(m.unit||'-')}</td><td class="price">${money(m.price)}</td><td><input class="qty" type="number" min="0" step="0.01" value="${num(quantities[m.id])||''}" placeholder="0"></td><td class="row-total">${num(quantities[m.id])?money(num(m.price)*num(quantities[m.id])):'-'}</td><td><div class="row-actions"><button class="action send">＋ Orçamento</button><button class="action edit">Editar</button><button class="action del">Excluir</button></div></td></tr>`).join('');
     $$('#materialsBody tr').forEach(r=>{const m=materials.find(x=>x.id===r.dataset.id);r.querySelector('.qty').oninput=e=>{quantities[m.id]=num(e.target.value);save();renderTable()};r.querySelector('.edit').onclick=()=>openEditor(m);r.querySelector('.del').onclick=()=>delMaterial(m);r.querySelector('.send').onclick=()=>openSend(m)});
   }
   function renderAll(){renderFilters();renderTable()}
