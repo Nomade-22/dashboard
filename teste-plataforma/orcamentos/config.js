@@ -125,6 +125,10 @@ if (localStorage.getItem('multprest_orc_team_size_v1') === null) {
     if(kpi)kpi.textContent='Valor Horas Viajadas';
     const help=document.querySelector('.route-help');
     if(help)help.innerHTML='<b>Busca de rota:</b> cálculo servido pela função segura do Supabase. A chave OpenRouteService permanece somente no servidor e não é exposta no GitHub público.';
+    const rateTitle=document.querySelector('.labor-rate-card h3');
+    if(rateTitle)rateTitle.textContent='Tabela de Tarifas Comerciais (R$/hora)';
+    const rateNote=document.querySelector('.labor-rate-card .warning-box');
+    if(rateNote)rateNote.innerHTML='<b>Fonte das tarifas:</b> Calc HH por Profissional + Cliente. Valores manuais do Orçamento continuam tendo prioridade. <b>JBS Couros e inss0</b> ainda não existem como empresas no Calc HH; para esses perfis, a tarifa deve ser cadastrada manualmente até incluirmos uma fonte confirmada.';
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
 })();
