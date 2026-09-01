@@ -3,7 +3,7 @@
  const SESSION='multprest_platform_session_key_v1';
  const SALT='R0mmRGIQZsAnYM4nmjON0Q';
  const ITERATIONS=310000;
- const VERIFIER='4FrQi3xwRPHmNvkD7VKwR19WrRyE3LJtyYj7JwtkNB4';
+ const VERIFIER='O0y9vs6ydPjZzK5LvD6-WL-m-Z-AfZYy2Xq1FDi1t_A';
  const $=s=>document.querySelector(s),status=$('#status'),btn=$('#loginBtn');
  const b64u=buf=>{let s='';new Uint8Array(buf).forEach(b=>s+=String.fromCharCode(b));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
  const from64=s=>{s=String(s||'').replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const b=atob(s),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a};
