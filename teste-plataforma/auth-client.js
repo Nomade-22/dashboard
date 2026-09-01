@@ -2,7 +2,7 @@
 (()=>{
   const API='https://multprest-sync-gateway-jhonatan23.vercel.app';
   const SESSION='multprest_platform_session_key_v1';
-  const VERIFIER='4FrQi3xwRPHmNvkD7VKwR19WrRyE3LJtyYj7JwtkNB4';
+  const VERIFIER='O0y9vs6ydPjZzK5LvD6-WL-m-Z-AfZYy2Xq1FDi1t_A';
   const script=document.currentScript;
   const scope=script?.dataset?.scope||'';
   const PREFIXES={orcamentos:['multprest_orc_'], 'calc-hh':['multprest_calc_hh_'], precos:['multprest_prices_'], adequacoes:['adq_civis_']};
