@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 export const ALLOWED_ORIGIN = 'https://nomade-22.github.io';
 export const UPSTREAM = 'https://73ee0db2-d333-4cc6-9729-ca6149cffff7.created.app';
 export const BOOTSTRAP_SALT = 'R0mmRGIQZsAnYM4nmjON0Q';
-export const BOOTSTRAP_VERIFIER = '4FrQi3xwRPHmNvkD7VKwR19WrRyE3LJtyYj7JwtkNB4';
+export const BOOTSTRAP_VERIFIER = 'O0y9vs6ydPjZzK5LvD6-WL-m-Z-AfZYy2Xq1FDi1t_A';
 export const ALLOWED_SCOPES = new Set(['orcamentos','calc-hh','precos','adequacoes']);
 
 export function setCors(req,res){
