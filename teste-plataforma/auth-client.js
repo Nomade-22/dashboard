@@ -1,6 +1,6 @@
 'use strict';
 (()=>{
-  const API='https://multprest-sync-gateway-jhonatan23.vercel.app';
+  const API='https://adugefhgzqruajjdavba.supabase.co/functions/v1/multprest-sync';
   const SESSION='multprest_platform_session_key_v1';
   const VERIFIER='O0y9vs6ydPjZzK5LvD6-WL-m-Z-AfZYy2Xq1FDi1t_A';
   const script=document.currentScript;
@@ -27,14 +27,14 @@
   async function setupRemote(bar){
     const status=bar.querySelector('#mpSyncStatus'),dot=bar.querySelector('.mp-dot'),actions=bar.querySelector('#mpRemoteActions');
     try{
-      const health=await api('/api/health');
+      const health=await api('/health');
       if(!health?.ok||!health?.storage)throw new Error('armazenamento indisponível');
-      await api('/api/auth-check',{method:'POST'});
-      dot.classList.add('ok');status.textContent='Sincronização remota online';
+      await api('/auth-check',{method:'POST'});
+      dot.classList.add('ok');status.textContent='Sincronização remota online • Supabase';
       if(scope){
         actions.innerHTML='<button class="primary" id="mpSaveRemote">Salvar no banco</button><button id="mpLoadRemote">Carregar do banco</button>';
-        actions.querySelector('#mpSaveRemote').onclick=async()=>{try{status.textContent='Salvando cópia criptografada...';await api(`/api/state?scope=${encodeURIComponent(scope)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:collect()})});status.textContent=`Salvo no banco • ${new Date().toLocaleTimeString('pt-BR')}`}catch(e){status.textContent=`Erro ao salvar: ${e.message}`}};
-        actions.querySelector('#mpLoadRemote').onclick=async()=>{try{status.textContent='Buscando cópia remota...';const r=await api(`/api/state?scope=${encodeURIComponent(scope)}`);if(!r?.data){status.textContent='Ainda não existe cópia remota deste módulo';return}if(!confirm('Carregar a cópia do banco? Os dados locais deste módulo serão substituídos.')){status.textContent='Carregamento cancelado';return}apply(r.data);status.textContent='Cópia carregada. Reabrindo módulo...';location.reload()}catch(e){status.textContent=`Erro ao carregar: ${e.message}`}};
+        actions.querySelector('#mpSaveRemote').onclick=async()=>{try{status.textContent='Salvando cópia criptografada...';await api(`/state?scope=${encodeURIComponent(scope)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:collect()})});status.textContent=`Salvo no banco • ${new Date().toLocaleTimeString('pt-BR')}`}catch(e){status.textContent=`Erro ao salvar: ${e.message}`}};
+        actions.querySelector('#mpLoadRemote').onclick=async()=>{try{status.textContent='Buscando cópia remota...';const r=await api(`/state?scope=${encodeURIComponent(scope)}`);if(!r?.data){status.textContent='Ainda não existe cópia remota deste módulo';return}if(!confirm('Carregar a cópia do banco? Os dados locais deste módulo serão substituídos.')){status.textContent='Carregamento cancelado';return}apply(r.data);status.textContent='Cópia carregada. Reabrindo módulo...';location.reload()}catch(e){status.textContent=`Erro ao carregar: ${e.message}`}};
       }
     }catch(e){dot.classList.add('bad');status.textContent='Remoto offline • sistema continua local';actions.innerHTML='';console.warn('Sincronização remota indisponível:',e)}
   }
