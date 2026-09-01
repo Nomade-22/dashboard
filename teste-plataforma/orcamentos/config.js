@@ -1,12 +1,13 @@
 // Configuração pública da interface.
-// Gateway de rotas da Plataforma Multprest. Ele libera CORS apenas para o GitHub Pages
-// e repassa a consulta ao backend original, onde a chave do OpenRouteService continua protegida.
-window.MULTPREST_ROUTE_API = window.MULTPREST_ROUTE_API || 'https://multprest-route-gateway-jhonatan23.vercel.app/api/calculate-route';
+// Gateway de rotas da Plataforma Multprest no Supabase.
+// Ele libera CORS apenas para o GitHub Pages e repassa a consulta ao backend original,
+// onde a chave do OpenRouteService continua protegida.
+window.MULTPREST_ROUTE_API = window.MULTPREST_ROUTE_API || 'https://adugefhgzqruajjdavba.supabase.co/functions/v1/multprest-route';
 
 // Proteção + sincronização criptografada do módulo.
 (() => {
   const s=document.createElement('script');
-  s.src='../auth-client.js?v=20260901-supabase2';
+  s.src='../auth-client.js?v=20260901-supabase3';
   s.dataset.scope='orcamentos';
   document.head.appendChild(s);
 })();
