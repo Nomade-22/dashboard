@@ -15,6 +15,7 @@
   function collect(){const ps=PREFIXES[scope]||[];const out={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(ps.some(p=>k.startsWith(p)))out[k]=localStorage.getItem(k)}return out}
   function apply(data){const ps=PREFIXES[scope]||[];const remove=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(ps.some(p=>k.startsWith(p)))remove.push(k)}remove.forEach(k=>localStorage.removeItem(k));Object.entries(data||{}).forEach(([k,v])=>{if(ps.some(p=>k.startsWith(p)))localStorage.setItem(k,String(v))})}
   async function api(path,init={}){const k=sessionKey();const r=await fetch(`${API}${path}`,{...init,headers:{Accept:'application/json',...(init.headers||{}),...(k?{Authorization:`Bearer ${k}`}:{})},cache:'no-store'});let data=null;try{data=await r.json()}catch{}if(!r.ok)throw new Error(data?.error||`HTTP ${r.status}`);return data}
+  function fmtDate(v){try{return new Date(v).toLocaleString('pt-BR')}catch{return String(v||'')}}
   function inject(){
     const host=document.querySelector('header')||document.body.firstElementChild||document.body;
     const bar=document.createElement('div');bar.id='mpSecureBar';
@@ -30,11 +31,13 @@
       const health=await api('/health');
       if(!health?.ok||!health?.storage)throw new Error('armazenamento indisponível');
       await api('/auth-check',{method:'POST'});
-      dot.classList.add('ok');status.textContent='Sincronização remota online • Supabase';
+      dot.classList.add('ok');
+      status.textContent='Sincronização remota online • Supabase';
       if(scope){
         actions.innerHTML='<button class="primary" id="mpSaveRemote">Salvar no banco</button><button id="mpLoadRemote">Carregar do banco</button>';
-        actions.querySelector('#mpSaveRemote').onclick=async()=>{try{status.textContent='Salvando cópia criptografada...';await api(`/state?scope=${encodeURIComponent(scope)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:collect()})});status.textContent=`Salvo no banco • ${new Date().toLocaleTimeString('pt-BR')}`}catch(e){status.textContent=`Erro ao salvar: ${e.message}`}};
-        actions.querySelector('#mpLoadRemote').onclick=async()=>{try{status.textContent='Buscando cópia remota...';const r=await api(`/state?scope=${encodeURIComponent(scope)}`);if(!r?.data){status.textContent='Ainda não existe cópia remota deste módulo';return}if(!confirm('Carregar a cópia do banco? Os dados locais deste módulo serão substituídos.')){status.textContent='Carregamento cancelado';return}apply(r.data);status.textContent='Cópia carregada. Reabrindo módulo...';location.reload()}catch(e){status.textContent=`Erro ao carregar: ${e.message}`}};
+        try{const existing=await api(`/state?scope=${encodeURIComponent(scope)}`);status.textContent=existing?.updatedAt?`Supabase online • última cópia ${fmtDate(existing.updatedAt)}`:'Supabase online • nenhuma cópia remota ainda'}catch{status.textContent='Sincronização remota online • Supabase'}
+        actions.querySelector('#mpSaveRemote').onclick=async()=>{try{status.textContent='Salvando cópia criptografada...';const r=await api(`/state?scope=${encodeURIComponent(scope)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:collect()})});status.textContent=`Salvo no banco • ${fmtDate(r?.savedAt||new Date().toISOString())}`}catch(e){status.textContent=`Erro ao salvar: ${e.message}`}};
+        actions.querySelector('#mpLoadRemote').onclick=async()=>{try{status.textContent='Buscando cópia remota...';const r=await api(`/state?scope=${encodeURIComponent(scope)}`);if(!r?.data){status.textContent='Ainda não existe cópia remota deste módulo';return}if(!confirm('Carregar a cópia do banco? Os dados locais deste módulo serão substituídos.')){status.textContent='Carregamento cancelado';return}apply(r.data);status.textContent=`Cópia de ${fmtDate(r.updatedAt)} carregada. Reabrindo módulo...`;location.reload()}catch(e){status.textContent=`Erro ao carregar: ${e.message}`}};
       }
     }catch(e){dot.classList.add('bad');status.textContent='Remoto offline • sistema continua local';actions.innerHTML='';console.warn('Sincronização remota indisponível:',e)}
   }
