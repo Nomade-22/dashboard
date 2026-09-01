@@ -116,3 +116,15 @@ if (localStorage.getItem('multprest_orc_team_size_v1') === null) {
     .then(()=>load('tabela-precos.js'))
     .catch((error)=>console.warn('Integração privada parcialmente indisponível:',error));
 })();
+
+// Ajustes de texto da interface após a migração.
+// O valor mostrado em Viagens é tarifa comercial faturável, não custo HH interno.
+(() => {
+  const apply=()=>{
+    const kpi=document.querySelector('#tripKpiCost')?.previousElementSibling;
+    if(kpi)kpi.textContent='Valor Horas Viajadas';
+    const help=document.querySelector('.route-help');
+    if(help)help.innerHTML='<b>Busca de rota:</b> cálculo servido pela função segura do Supabase. A chave OpenRouteService permanece somente no servidor e não é exposta no GitHub público.';
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
+})();
