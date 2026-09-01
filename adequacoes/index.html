@@ -28,8 +28,8 @@
 
 <main>
   <section class="security-banner">
-    <div><b>🔒 Dados sensíveis protegidos</b><span>Este módulo não contém OFs, fornecedores, valores ou credenciais no código público. Nesta fase ele usa somente os dados já existentes neste navegador.</span></div>
-    <span class="security-state">LOCAL</span>
+    <div><b>🔒 Dados sensíveis protegidos</b><span>OFs, fornecedores e valores ficam fora do código público. Use a barra protegida para salvar ou carregar a cópia criptografada deste módulo.</span></div>
+    <span class="security-state">CRIPTOGRAFADO</span>
   </section>
 
   <section id="dashboard" class="tab active">
@@ -63,7 +63,7 @@
           <button class="btn" id="btnExportar">Exportar CSV</button>
           <label class="btn ghost file-label" for="inputCSV">Importar CSV</label>
           <input id="inputCSV" type="file" accept=".csv" hidden>
-          <span class="muted">Dados importados ficam somente neste navegador.</span>
+          <span class="muted">Dados importados ficam neste navegador até você usar “Salvar no banco”.</span>
         </div>
         <div class="table-wrap"><table id="tabela"><thead><tr><th>OF</th><th>Data</th><th>Fornecedor</th><th>Materiais</th><th>Profissionais</th><th>Ajudantes</th><th>Almoço</th><th>Translado</th><th>Total</th><th></th></tr></thead><tbody></tbody></table></div>
       </div>
@@ -86,7 +86,7 @@
           <div class="btns"><button class="btn primary" type="submit" id="btnSalvarLanc">Adicionar</button><button class="btn ghost" type="button" id="btnCancelarEdit" hidden>Cancelar edição</button></div>
         </form>
       </div>
-      <div class="card"><h3>Como funciona</h3><ul class="muted help"><li>Cadastre as OFs primeiro; cada OF funciona como centro de custo.</li><li>Os cálculos de mão de obra mantêm a lógica do dashboard antigo.</li><li>Os dados permanecem locais até a autenticação e banco compartilhado serem habilitados.</li></ul></div>
+      <div class="card"><h3>Como funciona</h3><ul class="muted help"><li>Cadastre as OFs primeiro; cada OF funciona como centro de custo.</li><li>Os cálculos de mão de obra mantêm a lógica do dashboard antigo.</li><li>O botão “Salvar no banco” cria uma cópia criptografada do módulo.</li></ul></div>
     </div>
   </section>
 
@@ -114,12 +114,13 @@
         <div class="row2"><label class="small">Multiplicador sábado<input type="number" step="0.01" min="0" id="cfgMultSab"></label><label class="small">Multiplicador domingo/feriado<input type="number" step="0.01" min="0" id="cfgMultDom"></label></div>
         <div class="btns"><button class="btn primary" id="btnSalvarCfg" type="button">Salvar neste navegador</button></div>
       </div>
-      <div class="remote-locked"><b>Google Sheets / banco compartilhado</b><span>Bloqueado nesta etapa. URL, token e sincronização remota só serão reativados depois do Login/Autenticação.</span></div>
+      <div class="remote-locked"><b>Sincronização compartilhada</b><span>Use a barra “Plataforma protegida” acima para salvar ou carregar a cópia criptografada.</span></div>
     </div>
   </section>
 </main>
 <datalist id="fornList"></datalist>
 <div id="toast" class="toast"></div>
+<script src="../auth-client.js" data-scope="adequacoes"></script>
 <script src="app.js"></script>
 </body>
 </html>
