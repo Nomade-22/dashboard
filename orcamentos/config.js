@@ -1,10 +1,10 @@
 // Configuração pública da interface.
-// A URL da API pode ser preenchida após o backend privado ser publicado.
-// Exemplo: window.MULTPREST_ROUTE_API = 'https://api.exemplo.com/api/calculate-route';
+// A URL da API de rotas será preenchida quando publicarmos o backend privado.
 window.MULTPREST_ROUTE_API = window.MULTPREST_ROUTE_API || '';
 
-// Integração opcional com o núcleo do Calc HH.
-// Não copia nenhum valor automaticamente: apenas disponibiliza a prévia na aba Custos HH.
+// Integrações seguras da plataforma.
+// Nenhuma credencial é colocada no GitHub: os módulos abaixo consomem somente
+// endpoints próprios dos sistemas e mantêm escrita sensível protegida.
 (() => {
   const load=(src)=>new Promise((resolve,reject)=>{
     const s=document.createElement('script');
@@ -15,5 +15,6 @@ window.MULTPREST_ROUTE_API = window.MULTPREST_ROUTE_API || '';
   });
   load('../calc-hh/core.js')
     .then(()=>load('custos-hh.js'))
-    .catch((error)=>console.warn('Integração Calc HH indisponível:',error));
+    .then(()=>load('remote-db.js'))
+    .catch((error)=>console.warn('Integração privada parcialmente indisponível:',error));
 })();
