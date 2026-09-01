@@ -8,6 +8,7 @@
     document.head.appendChild(script);
   });
   load('core.js')
+    .then(() => load('fallback.js'))
     .then(() => load('ui.js'))
     .then(() => load('remote.js'))
     .catch((error) => {
