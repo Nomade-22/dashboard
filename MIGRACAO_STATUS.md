@@ -36,95 +36,65 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 
 ## 3. Orçamentos
 - [x] Estrutura das abas originais criada
-- [x] Módulo BDI iniciado
-- [x] Clientes e prazos atuais da base migrados
-- [x] Perfil BDI separado por cliente
-- [x] Material pode utilizar o perfil do próprio cliente
+- [x] BDI separado por cliente e prazo
 - [x] Fórmula `Preço = Custo / (1 - soma dos percentuais)` preservada
 - [x] Juros compostos por prazo preservados
-- [x] Mão de Obra
-- [x] Regra `Cliente + Profissional + Tipo de Hora = tarifa` preservada
-- [x] Multiplicadores Normal / 50% / 100% / 120% preservados
-- [x] Fórmula de venda `tarifa × multiplicador × horas × pessoas × dias` preservada
-- [x] HH, resumo por profissional e detalhamento de equipe implementados
-- [x] Tabela HH editável com importação/exportação local
-- [x] Horas Viajadas — interface e cálculos migrados
-- [x] Origem e Destino por cidade/estado preservados
-- [x] Ida / Ida e Volta preservados
-- [x] Horas automáticas ou manuais preservadas
-- [x] Regra `Pagar todos / Limite de horas` preservada
-- [x] Distância total, tempo total, tempo pago, pessoa-horas e custo preservados
-- [x] KM total e número de viagens disponibilizados para a aba Despesas
+- [x] Mão de Obra — Cliente + Profissional + Tipo de Hora
+- [x] Multiplicadores Normal / 50% / 100% / 120%
+- [x] HH, resumo por profissional e detalhamento de equipe
+- [x] Horas Viajadas — Origem/Destino, ida/volta, dias, pessoas e regra de pagamento
+- [x] KM e número de viagens disponibilizados para Despesas
 - [x] Contrato da API `/api/calculate-route` preservado
 - [ ] Backend privado da rota com OpenRouteService
 - [x] Despesas — Estadia, Transporte, Almoço, Janta e Café
-- [x] BDI da despesa calculado pelo cliente selecionado
-- [x] Transporte conectado ao KM total e nº de viagens de Horas Viajadas
-- [x] Transporte permite dados automáticos ou KM/viagens manuais
-- [x] Fórmula original do transporte preservada: `(KM × R$/km + pedágio) × viagens`
-- [x] Totais com BDI e totais sem BDI separados para cálculos posteriores
+- [x] Transporte conectado aos dados de Horas Viajadas
+- [x] Totais com BDI e sem BDI separados
 - [x] Nota Reversa
-- [x] ISSQN 5%, INSS 11% e Simples 14% conforme código original da Nota Reversa
-- [x] Antecipação calculada sobre o líquido após os demais impostos
+- [x] ISSQN 5%, INSS 11%, Simples 14% e antecipação conforme código original
 - [x] Dedução seletiva dos custos reais sem BDI
-- [x] Mão de Obra e Horas Viajadas usam custo interno HH, não tarifa de venda
-- [x] Custos internos HH mantidos fora do GitHub público e importáveis localmente
-- [x] Valor líquido final, % descontos e lucro preservados
-- [x] Negociação
-- [x] Puxar valores e composição da Nota Reversa
-- [x] Desconto por porcentagem ou valor fixo
-- [x] Botões rápidos 5%, 10%, 15%, 20%, 25% e 30%
-- [x] Recalcular impostos sobre o novo valor bruto após desconto
-- [x] Recalcular antecipação sobre o novo líquido após impostos
-- [x] Manter custos reais deduzidos durante a negociação
-- [x] Mostrar lucro/prejuízo, margem final, perda de lucro e % do lucro perdido
-- [x] Resumo Final
-- [x] Preço Final Total consolidado conforme Dashboard original
-- [x] Lucro Final e percentual vindos da Nota Reversa
-- [x] Cards de Mão de Obra, Material, Despesas de Viagem, Estadia, Transporte, Alimentação e Horas Viajadas
-- [x] Detalhamento completo e subtotal de alimentação
-- [x] Distribuição percentual de custos preservada
-- [x] Histórico local de Orçamentos
-- [x] Salvar e atualizar orçamento com número, cliente, descrição, status e observações
-- [x] Fotografia completa dos itens do orçamento
-- [x] Fotografia dos parâmetros históricos BDI/HH para reproduzir cálculo antigo
-- [x] Abrir/restaurar orçamento salvo
-- [x] Opção de restaurar ou manter os parâmetros atuais ao abrir um histórico
-- [x] Novo orçamento preservando configurações globais
-- [x] Busca, duplicação, exclusão e exportação JSON
-- [x] Importação de histórico JSON
+- [x] Negociação com desconto percentual ou fixo e recálculo dos impostos
+- [x] Resumo Final consolidado
+- [x] Histórico local completo com fotografia dos parâmetros usados
+- [x] Integração opcional com a Tabela de Preços
+- [x] Material só entra no Orçamento após ação explícita e confirmação do cliente/BDI
 - [ ] Persistência do Histórico no banco privado
-- [ ] Tabela de Preços interna
-- [ ] Custos HH integrados
+- [ ] Custos HH ligados diretamente ao Calc HH
 - [ ] Autenticação e usuários
 - [ ] Banco remoto / API privada
 
 ### Regra crítica de BDI
 Não existe um único BDI obrigatório para todos os clientes. A plataforma deve manter perfil e prazo por cliente. Valores default são apenas ponto de partida e não substituem configurações comerciais confirmadas.
 
-### Segurança da tabela de Mão de Obra e custos internos
-O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Por isso, tarifas comerciais de produção, custos internos HH, credenciais e chaves não devem ser gravados no código-fonte público. Nesta etapa, essas bases ficam no navegador do usuário (`localStorage`) e podem ser importadas por arquivos privados. Na etapa de produção, deverão vir de API/banco privado com autenticação.
+### Segurança
+O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Tarifas comerciais de produção, custos internos HH, base real de materiais, credenciais e chaves não devem ser gravados no código-fonte público. Nesta etapa, essas bases ficam no navegador e podem ser importadas. Na produção, deverão vir de API/banco privado com autenticação.
 
 ### Busca de rotas
-O sistema original usa OpenRouteService: geocodifica Origem e Destino limitando a busca ao Brasil e depois calcula a rota `driving-car`. A chave `OPENROUTE_API_KEY` deve permanecer apenas no backend privado. Nunca inserir essa chave em `config.js`, `viagens.js` ou qualquer arquivo do GitHub Pages. A interface está pronta para consumir o mesmo retorno do endpoint original: endereço resolvido, distância em km e duração em minutos.
-
-### Despesas
-A lógica segue o código original. Estadia/Alimentação usam custo unitário por pessoa por dia e aplicam BDI do cliente. Transporte utiliza `useKm = KM manual ou totalKm de Horas Viajadas`, `useViagens = viagens manuais ou totalViagens`, `R$/km = combustível ÷ km/l` e `base = (useKm × R$/km + pedágio) × useViagens`, aplicando depois o BDI do cliente. Os valores crus sem BDI são preservados separadamente para Nota Reversa.
-
-### Nota Reversa
-A lógica original foi preservada: ISSQN = 5% do bruto quando ativo; INSS = 11%; Simples = 14%; antecipação incide sobre o líquido após esses impostos. Em seguida, somente os custos marcados pelo usuário são deduzidos pelos valores sem BDI. `Valor Líquido Final = líquido após antecipação - custos selecionados`.
-
-### Negociação
-A negociação recebe uma fotografia dos valores da Nota Reversa. Ao aplicar desconto percentual ou fixo, o sistema cria o novo valor bruto, recalcula os impostos ativos e a antecipação, mantém os custos selecionados e calcula o lucro final. Também mostra o impacto do desconto e alerta se a proposta passa a gerar prejuízo.
-
-### Resumo Final
-Mantém a consolidação do `Dashboard.tsx` original: `Preço Final Total = Mão de Obra + Material + Estadia + Transporte + Almoço + Janta + Café + Horas Viajadas`. `Despesas de Viagem` é exibido também como subtotal visual, sem ser somado novamente no total geral. O Lucro Final continua sendo o resultado da Nota Reversa, como no sistema original.
+O sistema original usa OpenRouteService para geocodificar Origem/Destino no Brasil e calcular a rota `driving-car`. `OPENROUTE_API_KEY` deve ficar somente no backend privado.
 
 ### Histórico
-Nesta etapa o Histórico usa `localStorage`, pois ainda não há autenticação/API privada na plataforma consolidada. Cada registro guarda uma fotografia dos estados do orçamento e, separadamente, dos parâmetros BDI, tarifas HH e custos internos usados naquele momento. Ao abrir um registro antigo, o usuário pode restaurar também esses parâmetros para reproduzir o cálculo histórico. Esses dados não são gravados no código público do GitHub.
+Nesta etapa o Histórico usa `localStorage`. Cada registro guarda uma fotografia dos estados do orçamento e dos parâmetros BDI/HH usados naquele momento, permitindo reproduzir um cálculo antigo.
 
 ## 4. Tabela de Preços
-- [ ] Migração ainda não iniciada
+- [x] Interface principal migrada mantendo o visual claro do sistema original
+- [x] Busca por material
+- [x] Filtro por fornecedor
+- [x] Filtro por categoria e subcategoria
+- [x] Cadastro, edição e exclusão de material
+- [x] Quantidade por item e valor total do orçamento
+- [x] Salvar, carregar e excluir orçamentos próprios da Tabela de Preços
+- [x] Importação Excel/XLSX, CSV e JSON
+- [x] Exportação Excel
+- [x] Exclusão geral com dupla confirmação
+- [x] Integração opcional `Adicionar ao orçamento`
+- [x] `Apenas consultar / fechar` não altera o Orçamento
+- [x] Cliente é obrigatório antes de enviar material, evitando BDI incorreto
+- [x] Quantidade e preço de referência usados ficam registrados no item enviado
+- [ ] Conexão com banco remoto original
+- [ ] Categorias/subcategorias carregadas pelo backend privado
+- [ ] API pública/privada do sistema original
+
+### Integração Tabela de Preços → Orçamentos
+Consultar, pesquisar, filtrar ou selecionar material nunca altera o Orçamento. O envio acontece somente ao clicar em `Adicionar ao orçamento`, informar quantidade, escolher o cliente e confirmar. O custo da Tabela é enviado como referência; o BDI é aplicado somente no sistema de Orçamentos conforme o cliente escolhido.
 
 ## 5. Dashboard sensível
 - [ ] Integrar somente após os três sistemas estarem validados e a autenticação estar pronta.
