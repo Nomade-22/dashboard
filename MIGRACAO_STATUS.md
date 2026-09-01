@@ -9,36 +9,37 @@ A branch `main` permanece sem alterações durante a validação.
 - [x] Calc HH
 - [x] Tabela de Preços
 - [x] Adequações Civis / Dashboard sensível
-- [x] Navegação por hash para os quatro sistemas
+- [x] Login administrativo único ligado ao portal
 
 ## Calc HH
 - [x] Interface e três abas migradas
 - [x] Fórmulas originais validadas numericamente
-- [x] Antecipação, margem e prova real preservadas
 - [x] Leitura segura do banco original
-- [ ] Escrita remota — depende do Login/Autenticação
+- [x] Barra autenticada `Salvar no banco / Carregar do banco`
+- [x] Snapshot remoto criptografado do estado `multprest_calc_hh_*`
 
 ## Orçamentos
 - [x] BDI por cliente e prazo
 - [x] Mão de Obra — Cliente + Profissional + Tipo de Hora
-- [x] Horas Viajadas
-- [x] Despesas multi-item
-- [x] Nota Reversa
-- [x] Negociação
-- [x] Resumo Final
-- [x] Histórico local
-- [x] Integração opcional com Tabela de Preços
-- [x] Integração opcional com Calc HH
-- [x] Gateway Origem → Destino configurado
-- [ ] Histórico compartilhado — depende do Login/Autenticação
+- [x] Horas Viajadas e gateway Origem → Destino
+- [x] Despesas, Nota Reversa, Negociação, Resumo e Histórico
+- [x] Integrações opcionais com Tabela de Preços e Calc HH
+- [x] Barra autenticada `Salvar no banco / Carregar do banco`
+- [x] Snapshot remoto criptografado do estado `multprest_orc_*`
 
 ## Tabela de Preços
 - [x] Interface, busca, filtros, cadastro local e orçamentos próprios
-- [x] Importação/exportação
-- [x] Leitura segura do banco original
-- [x] Sincronização paginada de toda a base
+- [x] Leitura do banco original e sincronização paginada
 - [x] `Adicionar ao orçamento` continua opcional
-- [ ] Escrita remota — depende do Login/Autenticação
+- [x] Barra autenticada `Salvar no banco / Carregar do banco`
+- [x] Snapshot remoto criptografado do estado `multprest_prices_*`
+
+## Adequações Civis
+- [x] Dashboard, Lançamentos, OFs, Fornecedores e Configurações
+- [x] Mesmas chaves históricas `adq_civis_*`
+- [x] Nenhuma OF, fornecedor, lançamento ou credencial no código público
+- [x] Barra autenticada `Salvar no banco / Carregar do banco`
+- [x] Snapshot remoto criptografado do estado `adq_civis_*`
 
 ## Etapa 1 — Validação
 - [x] 31 testes numéricos de referência aprovados
@@ -51,7 +52,26 @@ A branch `main` permanece sem alterações durante a validação.
 - [x] Gateway Vercel criado
 - [x] CORS restrito a `https://nomade-22.github.io`
 - [x] `orcamentos/config.js` aponta para o gateway
-- [ ] Smoke test final — executar quando a nova plataforma estiver servida no domínio oficial
+- [ ] Smoke test final no domínio oficial após publicação da branch
+
+## Etapa 3 — Login / Autenticação / Escrita remota
+- [x] Página `login/` criada
+- [x] Login administrativo único para os quatro módulos
+- [x] Senha não é enviada em texto ao gateway
+- [x] PBKDF2-SHA256 com 310.000 iterações para derivação da chave
+- [x] Sessão guardada somente em `sessionStorage` da aba
+- [x] Logout remove a chave de sessão
+- [x] Gateway valida a chave derivada antes de ler/gravar
+- [x] Estados são criptografados com AES-256-GCM antes da persistência remota
+- [x] O backend original recebe somente ciphertext, nunca os dados empresariais em texto
+- [x] Escopos separados: `orcamentos`, `calc-hh`, `precos`, `adequacoes`
+- [x] CORS de autenticação restrito ao domínio oficial do GitHub Pages
+- [x] Deploy de produção do gateway solicitado no Vercel (`dpl_9bNZCMiwigBeU5RMQqShpgndeSGQ`)
+- [x] Vetor local de autenticação validado contra o verificador publicado
+- [ ] Smoke test final de Login + Salvar + Carregar no domínio oficial após publicação da branch
+
+### Observação sobre o Neon
+O projeto privado `plataforma-multprest` continua reservado para a consolidação futura. Durante esta etapa, o conector Neon apresentou incompatibilidade interna nas operações SQL/provisionamento (`projectId` x `project_id`). Para não expor credenciais nem forçar alterações no banco, a escrita autenticada foi implementada por snapshots criptografados através do gateway. Os bancos originais continuam preservados.
 
 ## Etapa 4 — Bancos privados
 - [x] Dumps mantidos fora do GitHub público
@@ -60,21 +80,15 @@ A branch `main` permanece sem alterações durante a validação.
 - [x] Leituras de Calc HH e Preços ligadas aos backends originais
 - [x] Nenhuma senha, token, `DATABASE_URL` ou dump foi publicado
 
-## Etapa 5 — Dashboard sensível / Adequações Civis
-- [x] Módulo `adequacoes/` integrado ao portal como Sistema 04
-- [x] Dashboard, Lançamentos, OFs, Fornecedores e Configurações locais
-- [x] Fórmulas do dashboard antigo preservadas: dia útil/sábado/domingo, mão de obra, almoço, materiais, translado, total, orçamento e saldo
-- [x] Mesmas chaves de `localStorage` do dashboard antigo preservadas para reaproveitar os dados existentes no mesmo navegador
-- [x] Nenhuma OF, lançamento, fornecedor ou credencial foi copiado para o código público
-- [x] Valores de fallback de Profissional/Ajudante/Almoço zerados no código novo
+## Etapa 5 — Dashboard sensível
+- [x] Adequações Civis integrado como Sistema 04
+- [x] Fórmulas do dashboard antigo preservadas
+- [x] Valores sensíveis não foram copiados para o novo módulo
 - [x] CSV e impressão/PDF mantidos
-- [x] Google Sheets remoto bloqueado nesta fase
-- [ ] Reativar Google Sheets/banco compartilhado somente após Login/Autenticação
-
-**Conclusão da etapa 5:** o Dashboard sensível está integrado em modo local seguro. Ele pode reutilizar os dados já existentes no navegador porque mantém as chaves históricas, mas dados compartilhados e credenciais continuam bloqueados até a autenticação.
-
-## Próximo passo funcional restante
-3. Login/Autenticação e liberação das escritas remotas.
+- [x] Escrita compartilhada agora disponível pela camada autenticada/criptografada da Plataforma Multprest
 
 ## Segurança
-O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Dados empresariais, tarifas confidenciais, custos internos, dumps, tokens e chaves permanecem fora do código público. A `main` só deve ser alterada depois da validação e da proteção por autenticação.
+O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. A autenticação controla o acesso à aplicação e às gravações remotas, mas não transforma o código-fonte do repositório em privado. Dados empresariais enviados ao armazenamento remoto são criptografados; credenciais, dumps e chaves privadas continuam fora do GitHub.
+
+## Situação atual
+As etapas 1, 2, 3, 4 e 5 estão implementadas na branch de trabalho. Antes de alterar a `main`, falta publicar/servir a nova branch para executar os smoke tests finais de rota, login e sincronização.
