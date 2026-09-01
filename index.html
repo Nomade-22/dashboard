@@ -44,7 +44,7 @@
 
       <section class="system-panel" id="panel-adequacoes">
         <div class="panel-head"><div><span class="module-tag sensitive">Sistema 04 • Sensível</span><h3>Adequações Civis</h3><p>Dashboard por OF com lançamentos, fornecedores, saldo, materiais, mão de obra e indiretos.</p></div><a class="primary-action" href="adequacoes/">Entrar no sistema</a></div>
-        <div class="security-card"><b>🔒 Integração protegida</b><span>OFs, lançamentos, fornecedores, taxas e credenciais não foram copiados para o GitHub. O módulo reutiliza somente os dados locais já existentes neste navegador; sincronização remota permanece bloqueada até o login.</span></div>
+        <div class="security-card"><b>🔒 Integração protegida</b><span>OFs, lançamentos, fornecedores, taxas e credenciais ficam fora do código público. O módulo pode salvar e carregar uma cópia criptografada após autenticação.</span></div>
         <div class="module-grid"><div class="module-card"><b>Dashboard</b><span>KPIs, gráficos, filtros, orçamento e saldo por OF.</span></div><div class="module-card"><b>Lançamentos</b><span>Materiais, equipe, almoço, translado e tipo de dia.</span></div><div class="module-card"><b>OFs</b><span>Centros de custo, cliente e orçamento.</span></div><div class="module-card"><b>Fornecedores</b><span>Cadastro, apelidos e unificação.</span></div></div>
       </section>
 
@@ -53,15 +53,16 @@
         <ol>
           <li class="done"><span>1</span><div><b>Validação</b><small>31 testes numéricos aprovados.</small></div></li>
           <li class="done"><span>2</span><div><b>Rotas</b><small>Gateway preparado para Origem → Destino.</small></div></li>
-          <li><span>3</span><div><b>Login / Autenticação</b><small>Próxima proteção necessária para gravações remotas.</small></div></li>
+          <li class="current"><span>3</span><div><b>Login / Autenticação</b><small>Proteção e sincronização criptografada em implantação.</small></div></li>
           <li class="done"><span>4</span><div><b>Bancos privados</b><small>Leituras conectadas sem expor credenciais.</small></div></li>
-          <li class="done"><span>5</span><div><b>Dashboard sensível</b><small>Integrado em modo local seguro, sem dados no código público.</small></div></li>
+          <li class="done"><span>5</span><div><b>Dashboard sensível</b><small>Integrado sem publicar dados empresariais.</small></div></li>
         </ol>
       </section>
     </main>
 
     <footer><span>Multprest Serviços Industriais</span><span>Plataforma em desenvolvimento</span></footer>
   </div>
+  <script src="auth-client.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
