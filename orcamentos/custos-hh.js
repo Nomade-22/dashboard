@@ -6,6 +6,7 @@
   const num=v=>Number.isFinite(Number(v))?Number(v):0;
   const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(num(v));
   const KEY='multprest_orc_internal_hour_costs_v1';
+  const RETURN_KEY='multprest_return_custos_hh';
   const MAP={
     'mecanico-caldeireiro':'caldereiro',
     'pedreiro':'pedreiro',
@@ -46,16 +47,19 @@
     bind(rows);
   }
 
+  function reloadAndReturn(){sessionStorage.setItem(RETURN_KEY,'1');location.reload()}
   function bind(rows){
-    $('#applyHH').onclick=()=>{if(!rows.length)return;if(!confirm('Aplicar os custos internos calculados no Calc HH à Nota Reversa do Orçamento? As tarifas comerciais de venda não serão alteradas.'))return;const obj={};rows.forEach(r=>obj[r.workerId]=Number(r.custoHora.toFixed(6)));localStorage.setItem(KEY,JSON.stringify(obj));window.dispatchEvent(new CustomEvent('multprest:internal-hh-updated'));render()};
-    $('#clearHH').onclick=()=>{if(confirm('Remover os custos internos aplicados pelo Calc HH? Depois você poderá importar/preencher novamente.')){localStorage.removeItem(KEY);window.dispatchEvent(new CustomEvent('multprest:internal-hh-updated'));render()}};
+    $('#applyHH').onclick=()=>{if(!rows.length)return;if(!confirm('Aplicar os custos internos calculados no Calc HH à Nota Reversa do Orçamento? As tarifas comerciais de venda não serão alteradas.'))return;const obj={};rows.forEach(r=>obj[r.workerId]=Number(r.custoHora.toFixed(6)));localStorage.setItem(KEY,JSON.stringify(obj));reloadAndReturn()};
+    $('#clearHH').onclick=()=>{if(confirm('Remover os custos internos aplicados pelo Calc HH? Depois você poderá importar/preencher novamente.')){localStorage.removeItem(KEY);reloadAndReturn()}};
     $('#keepManual').onclick=()=>{const t=document.getElementById('toast');if(t){t.textContent='Nenhuma alteração realizada';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1600)}};
   }
+
+  function restoreTab(attempt=0){if(sessionStorage.getItem(RETURN_KEY)!=='1')return;const b=document.querySelector('[data-tab="custos-hh"]');if(b){b.click();sessionStorage.removeItem(RETURN_KEY);return}if(attempt<10)setTimeout(()=>restoreTab(attempt+1),100)}
 
   const style=document.createElement('style');
   style.textContent=`.hh-source{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:12px;padding:0;overflow:hidden}.hh-source div{padding:13px;border-right:1px solid var(--line)}.hh-source div:last-child{border-right:0}.hh-source span{display:block;color:var(--muted);font-size:9px;margin-bottom:4px}.hh-source strong{font-size:11px}.hh-table-card{margin-bottom:12px}.hh-cost-table td strong{color:#6ee7b7}.hh-applied{color:#6ee7b7;font-weight:700}.hh-not{color:#64748b}.hh-actions{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px}.hh-actions b{font-size:11px}.hh-actions p{margin:4px 0 0;color:#94a3b8;font-size:10px;max-width:760px;line-height:1.5}.hh-actions .btn{flex-shrink:0}@media(max-width:800px){.hh-source{grid-template-columns:1fr 1fr}.hh-source div:nth-child(2){border-right:0}.hh-actions{align-items:flex-start;flex-direction:column}}`;
   document.head.appendChild(style);
   document.querySelector('[data-tab="custos-hh"]')?.addEventListener('click',()=>setTimeout(render,0));
   window.addEventListener('storage',e=>{if(e.key===KEY)render()});
-  render();
+  render();setTimeout(()=>restoreTab(),150);
 })();
