@@ -1,0 +1,58 @@
+'use strict';
+(() => {
+  const API='https://1c6ea4b9-b2b7-4514-aae1-ab1263b2b25d.created.app';
+  const KEY_M='multprest_prices_materials_v1';
+  const KEY_META='multprest_prices_remote_meta_v1';
+  const $=s=>document.querySelector(s);
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const loadMeta=()=>{try{return JSON.parse(localStorage.getItem(KEY_META)||'{}')}catch{return{}}};
+
+  function inject(){
+    const main=$('main.container'); if(!main||$('#remotePriceBar'))return;
+    const meta=loadMeta();
+    const bar=document.createElement('section');
+    bar.id='remotePriceBar';bar.className='remote-db-bar';
+    bar.innerHTML=`<div><span class="remote-dot" id="remotePriceDot"></span><div><b>Banco privado — Tabela de Preços</b><small id="remotePriceStatus">Verificando conexão...</small></div></div><div class="remote-actions"><span id="remotePriceLast">${meta.syncedAt?`Última cópia: ${new Date(meta.syncedAt).toLocaleString('pt-BR')}`:'Ainda não sincronizado'}</span><button id="btnSyncRemotePrices">Atualizar do banco</button></div>`;
+    main.insertBefore(bar,main.firstChild);
+    const st=document.createElement('style');st.textContent=`.remote-db-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:11px 13px;margin-bottom:14px;box-shadow:0 3px 14px rgba(15,23,42,.04)}.remote-db-bar>div{display:flex;align-items:center;gap:9px}.remote-db-bar b{display:block;font-size:11px}.remote-db-bar small{display:block;color:#64748b;font-size:9px;margin-top:2px}.remote-dot{width:9px;height:9px;border-radius:50%;background:#f59e0b;box-shadow:0 0 0 4px #fef3c7}.remote-dot.ok{background:#10b981;box-shadow:0 0 0 4px #d1fae5}.remote-dot.bad{background:#ef4444;box-shadow:0 0 0 4px #fee2e2}.remote-actions{font-size:9px;color:#64748b}.remote-actions button{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:8px 10px;font:700 10px Inter;cursor:pointer}.remote-actions button:disabled{opacity:.55;cursor:wait}@media(max-width:700px){.remote-db-bar{align-items:flex-start;flex-direction:column}.remote-actions{width:100%;justify-content:space-between}}`;
+    document.head.appendChild(st);
+    $('#btnSyncRemotePrices').onclick=syncFull;
+  }
+
+  function setStatus(ok,text){
+    const dot=$('#remotePriceDot'),status=$('#remotePriceStatus');if(!dot||!status)return;
+    dot.classList.remove('ok','bad');dot.classList.add(ok===true?'ok':ok===false?'bad':'');status.textContent=text;
+  }
+
+  async function request(limit=1){
+    const r=await fetch(`${API}/api/public/materials?limit=${limit}`,{headers:{Accept:'application/json'},cache:'no-store'});
+    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    const j=await r.json();
+    if(j&&j.success===false)throw new Error(j.error||'Falha na API');
+    return {rows:Array.isArray(j)?j:(Array.isArray(j.data)?j.data:[]),total:Number(j?.pagination?.total??j?.data?.length??0)};
+  }
+
+  async function check(){
+    try{const d=await request(1);setStatus(true,`Conectado ao banco original • ${d.total} materiais cadastrados`)}
+    catch(e){console.warn('Banco de preços indisponível',e);setStatus(false,'Sem acesso ao banco agora — usando a cópia local deste navegador')}
+  }
+
+  async function syncFull(){
+    const b=$('#btnSyncRemotePrices');if(b){b.disabled=true;b.textContent='Atualizando...'}
+    try{
+      const d=await request(500);
+      const mapped=d.rows.map(r=>({id:String(r.id),name:String(r.name||''),unit:String(r.unit||''),price:Number(r.price)||0,supplier:String(r.supplier||''),category:String(r.category||''),subcategory:String(r.subcategory||''),source:'banco-privado'}));
+      localStorage.setItem(KEY_M,JSON.stringify(mapped));
+      const meta={syncedAt:new Date().toISOString(),count:mapped.length,total:d.total,api:API};localStorage.setItem(KEY_META,JSON.stringify(meta));
+      setStatus(true,`Banco sincronizado • ${d.total} materiais`);
+      if($('#remotePriceLast'))$('#remotePriceLast').textContent=`Última cópia: ${new Date(meta.syncedAt).toLocaleString('pt-BR')}`;
+      alert(`Tabela atualizada com ${mapped.length} materiais do banco privado.\n\nAs alterações feitas nesta versão de teste continuam locais até ativarmos o login e a escrita autenticada.`);
+      location.reload();
+    }catch(e){console.error(e);setStatus(false,'Não foi possível atualizar — a base local foi mantida');alert('Não foi possível consultar o banco agora. Nenhum dado local foi apagado.')}
+    finally{if(b){b.disabled=false;b.textContent='Atualizar do banco'}}
+  }
+
+  window.MULTPREST_DATA_SOURCES=window.MULTPREST_DATA_SOURCES||{};
+  window.MULTPREST_DATA_SOURCES.precos={api:API,mode:'read-through-local-cache'};
+  inject();check();
+})();
