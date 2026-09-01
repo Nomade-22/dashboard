@@ -20,6 +20,7 @@ A branch `main` permanece sem alterações durante a validação.
 - [x] Cargos e salários atuais da base incluídos
 - [x] Empresas e prazos da base incluídos
 - [x] Exportação TXT/CSV
+- [x] Núcleo de cálculo reutilizado opcionalmente pelo sistema de Orçamentos
 - [ ] Conexão com banco remoto (depois da validação da versão estática)
 
 ### Teste de referência Calc HH
@@ -57,8 +58,12 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 - [x] Histórico local completo com fotografia dos parâmetros usados
 - [x] Integração opcional com a Tabela de Preços
 - [x] Material só entra no Orçamento após ação explícita e confirmação do cliente/BDI
+- [x] Aba Custos HH consulta o núcleo real do Calc HH
+- [x] Prévia de custo interno/h por cargo calculada com as configurações atuais do Calc HH
+- [x] Aplicação dos custos internos somente após confirmação explícita
+- [x] Tarifas comerciais de Mão de Obra não são sobrescritas pela integração de custos internos
+- [x] Opção de manter custos manuais sem sincronizar
 - [ ] Persistência do Histórico no banco privado
-- [ ] Custos HH ligados diretamente ao Calc HH
 - [ ] Autenticação e usuários
 - [ ] Banco remoto / API privada
 
@@ -66,13 +71,16 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 Não existe um único BDI obrigatório para todos os clientes. A plataforma deve manter perfil e prazo por cliente. Valores default são apenas ponto de partida e não substituem configurações comerciais confirmadas.
 
 ### Segurança
-O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Tarifas comerciais de produção, custos internos HH, base real de materiais, credenciais e chaves não devem ser gravados no código-fonte público. Nesta etapa, essas bases ficam no navegador e podem ser importadas. Na produção, deverão vir de API/banco privado com autenticação.
+O repositório `Nomade-22/dashboard` e o GitHub Pages são públicos. Tarifas comerciais de produção, custos internos HH, base real de materiais, credenciais e chaves não devem ser gravados no código-fonte público. Nesta etapa, as bases operacionais ficam no navegador e podem ser importadas. Na produção, deverão vir de API/banco privado com autenticação.
 
 ### Busca de rotas
 O sistema original usa OpenRouteService para geocodificar Origem/Destino no Brasil e calcular a rota `driving-car`. `OPENROUTE_API_KEY` deve ficar somente no backend privado.
 
 ### Histórico
 Nesta etapa o Histórico usa `localStorage`. Cada registro guarda uma fotografia dos estados do orçamento e dos parâmetros BDI/HH usados naquele momento, permitindo reproduzir um cálculo antigo.
+
+### Custos HH
+A integração não confunde `CUSTO HH` com `TARIFA HH DE VENDA`. O módulo consulta o mesmo `CalcHHCore` usado pelo Calc HH e calcula o custo interno por hora como `custoTotalMensal / jornada` para cada cargo. Esses valores só são enviados para a base interna da Nota Reversa quando o usuário confirma. Alterar o Calc HH não modifica automaticamente um orçamento.
 
 ## 4. Tabela de Preços
 - [x] Interface principal migrada mantendo o visual claro do sistema original
@@ -83,6 +91,7 @@ Nesta etapa o Histórico usa `localStorage`. Cada registro guarda uma fotografia
 - [x] Quantidade por item e valor total do orçamento
 - [x] Salvar, carregar e excluir orçamentos próprios da Tabela de Preços
 - [x] Importação Excel/XLSX, CSV e JSON
+- [x] Importação preserva preços numéricos e casas decimais do Excel
 - [x] Exportação Excel
 - [x] Exclusão geral com dupla confirmação
 - [x] Integração opcional `Adicionar ao orçamento`
