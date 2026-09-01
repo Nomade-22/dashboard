@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Orçamentos — Multprest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <a href="../" class="back">←</a>
+        <div class="logo">M</div>
+        <div><h1>Sistema de Orçamentos</h1><p>Multprest Serviços Industriais</p></div>
+      </div>
+      <span class="migration-badge">Migração v1</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <nav class="main-tabs" id="mainTabs">
+      <button data-tab="mao-de-obra">👷 Mão de Obra</button>
+      <button class="active" data-tab="bdi">🧮 BDI</button>
+      <button data-tab="despesas">🧾 Despesas</button>
+      <button data-tab="viagens">📍 Viagens</button>
+      <button data-tab="nota-reversa">↩ Nota Reversa</button>
+      <button data-tab="negociacao">🤝 Negociação</button>
+      <button data-tab="resumo">▦ Resumo Final</button>
+      <button data-tab="historico">▣ Histórico</button>
+      <button data-tab="tabela-precos">⚙ Tabela de Preços</button>
+      <button data-tab="custos-hh">$ Custos HH</button>
+    </nav>
+
+    <section class="tab-panel" id="tab-mao-de-obra">
+      <div class="page-title">
+        <div><span class="eyebrow">Composição de equipe</span><h2>Mão de Obra</h2><p>Regra preservada do sistema original: tarifa base do profissional por cliente × multiplicador do tipo de hora × horas × pessoas × dias.</p></div>
+        <div class="title-actions"><button class="btn ghost" id="btnExportRates">Exportar tabela</button><label class="btn ghost file-btn" for="inputRates">Importar tabela</label><input id="inputRates" type="file" accept=".csv,.json" hidden><button class="btn" id="btnAddLabor">+ Adicionar Mão de Obra</button></div>
+      </div>
+
+      <div class="labor-kpis">
+        <div class="kpi blue"><span>Itens</span><strong id="laborKpiItens">1</strong></div>
+        <div class="kpi amber"><span>HH Total</span><strong id="laborKpiHH">0,00 HH</strong></div>
+        <div class="kpi purple"><span>Pessoas somadas</span><strong id="laborKpiPessoas">0</strong></div>
+        <div class="kpi green"><span>Total Venda</span><strong id="laborKpiTotal">R$ 0,00</strong></div>
+      </div>
+
+      <section class="card labor-rate-card">
+        <div class="card-title actions-title">
+          <div><h3>Tabela de Preços (R$/hora)</h3><p>As taxas são específicas por Profissional + Cliente. Os tipos de hora aplicam multiplicadores sobre esta taxa base.</p></div>
+          <div><button class="btn ghost" id="btnResetRates">↻ Zerar taxas locais</button><button class="btn" id="btnSaveRates">Salvar tabela neste navegador</button></div>
+        </div>
+        <div class="warning-box compact"><b>Segurança:</b> a base de produção não está escrita no código público desta branch. Para testes, importe sua tabela local ou preencha os valores; depois conectaremos a API privada.</div>
+        <div class="rate-table-wrap"><table class="rate-table" id="laborRateTable"></table></div>
+      </section>
+
+      <div class="labor-toolbar"><button class="btn ghost danger" id="btnResetLabor">↻ Zerar itens</button><button class="btn" id="btnAddLabor2">+ Adicionar Mão de Obra</button></div>
+      <div id="laborItems" class="labor-items"></div>
+
+      <div class="labor-summary-grid">
+        <section class="card">
+          <div class="card-title"><h3>Resumo por Profissional</h3></div>
+          <div id="laborByWorker" class="breakdown"></div>
+          <div class="labor-grand"><span>Total Geral</span><strong id="laborGrandTotal">R$ 0,00</strong></div>
+        </section>
+        <section class="card detail-card">
+          <div class="card-title"><h3>Detalhamento Geral</h3></div>
+          <div class="team-row"><label>Pessoas por equipe (máx. por dia)<input id="teamSize" type="number" min="1" max="9" value="5"></label><div><span>Dias de equipe necessários</span><strong id="teamDays">0 dias</strong><small id="teamCalc">0 pessoas ÷ 5 por equipe</small></div></div>
+          <div class="detail-grid"><div><span>Total Pessoas</span><strong id="detailPeople">0</strong></div><div><span>Total Dias</span><strong id="detailDays">0</strong></div></div>
+          <div class="hours-title">Horas por Tipo</div><div id="hoursByType" class="hours-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="tab-panel active" id="tab-bdi">
+      <div class="page-title">
+        <div><span class="eyebrow">Formação de preço</span><h2>BDI por cliente</h2><p>Cada cliente mantém seu próprio prazo e pode manter seus próprios percentuais comerciais. O cálculo respeita a fórmula do sistema original.</p></div>
+        <button class="btn ghost" id="btnResetBDI">↻ Restaurar perfil</button>
+      </div>
+
+      <div class="client-bar card">
+        <label>Cliente do perfil<select id="perfilCliente"></select></label>
+        <div class="client-info"><span>Prazo cadastrado</span><strong id="perfilDias">—</strong></div>
+        <div class="client-info"><span>BDI calculado</span><strong id="perfilBdi">0,00%</strong></div>
+        <button class="btn" id="btnSalvarPerfil">Salvar perfil deste cliente</button>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi green"><span>Valor NF</span><strong id="kpiNF">R$ 0,00</strong></div>
+        <div class="kpi blue"><span>Lucro</span><strong id="kpiLucro">R$ 0,00</strong></div>
+        <div class="kpi amber"><span>BDI Total</span><strong id="kpiBDI">0,00%</strong></div>
+        <div class="kpi purple"><span>Sobra</span><strong id="kpiSobra">R$ 0,00</strong></div>
+      </div>
+
+      <div class="grid-2 main-grid">
+        <section class="card">
+          <div class="card-title"><h3>Encargos do perfil selecionado</h3><span class="pill" id="profileState">Perfil local</span></div>
+          <div class="fields grid-2">
+            <label>INSS %<div class="input"><input type="number" step="0.01" data-bdi="inss"><span>%</span></div></label>
+            <label>Simples + ISSQN %<div class="input"><input type="number" step="0.01" data-bdi="simplesIssqn"><span>%</span></div></label>
+            <label>Lucro %<div class="input"><input type="number" step="0.01" data-bdi="lucroPercent"><span>%</span></div></label>
+            <label>Troca de Nota %<div class="input"><input type="number" step="0.01" data-bdi="trocaNota"><span>%</span></div></label>
+            <label>Juros / dia %<div class="input"><input type="number" step="0.001" data-bdi="jurosDia"><span>%</span></div></label>
+            <label>Dias para pagamento<div class="input"><input type="number" step="1" data-bdi="diasPagamento"><span>dias</span></div></label>
+            <label>Desconto compras %<div class="input"><input type="number" step="0.01" data-bdi="descontoCompras"><span>%</span></div></label>
+          </div>
+          <div class="formula-box"><b>Fórmula preservada:</b> Preço = Custo ÷ (1 − soma dos percentuais). O custo financeiro usa juros compostos: ((1 + juros/dia) ^ dias − 1).</div>
+        </section>
+
+        <section class="card">
+          <div class="card-title"><h3>Resumo do perfil</h3></div>
+          <div class="breakdown" id="perfilBreakdown"></div>
+          <div class="warning-box">Os valores DEFAULT servem apenas como ponto inicial. Salve o perfil correto de cada cliente antes de usar em orçamento real.</div>
+        </section>
+      </div>
+
+      <section class="card materials-card">
+        <div class="card-title actions-title"><div><h3>Materiais</h3><p>Cada material pode usar o BDI do cliente correspondente.</p></div><div><button class="btn ghost" id="btnResetMateriais">↻ Zerar</button><button class="btn" id="btnAddMaterial">+ Adicionar Material</button></div></div>
+        <div class="material-head"><span>Cliente</span><span>Descrição</span><span>Custo material</span><span>Valor NF</span><span></span></div>
+        <div id="materialList"></div>
+        <div class="material-total"><span>Total custo</span><strong id="totalCustoMaterial">R$ 0,00</strong><span>Total NF</span><strong id="totalNFMaterial">R$ 0,00</strong></div>
+      </section>
+    </section>
+
+    <section class="tab-panel placeholder" id="tab-despesas"><h2>Despesas</h2><p>Hospedagem, transporte, almoço, janta e café serão preservados e utilizarão os KM/viagens calculados nesta aba.</p></section>
+
+    <section class="tab-panel" id="tab-viagens">
+      <div class="page-title">
+        <div><span class="eyebrow">Deslocamentos da equipe</span><h2>Horas Viajadas</h2><p>Mantém a lógica do sistema original: busca Origem → Destino, distância e duração da rota, ida ou ida/volta, dias, pessoas, regra de pagamento e tarifa por Cliente + Função + Tipo de Hora.</p></div>
+        <div class="title-actions"><button class="btn ghost danger" id="btnResetTrips">↻ Zerar</button><button class="btn" id="btnAddTrip">+ Adicionar Trecho</button></div>
+      </div>
+
+      <div class="travel-kpis">
+        <div class="kpi blue"><span>Distância</span><strong id="tripKpiDistance">0 km</strong></div>
+        <div class="kpi purple"><span>Tempo</span><strong id="tripKpiTime">0 min</strong></div>
+        <div class="kpi green"><span>Pago</span><strong id="tripKpiPaid">0 min</strong></div>
+        <div class="kpi amber"><span>P-Horas</span><strong id="tripKpiPH">0,0</strong></div>
+        <div class="kpi teal"><span>Custo</span><strong id="tripKpiCost">R$ 0,00</strong></div>
+      </div>
+
+      <section class="card travel-config">
+        <div class="card-title"><div><h3>Configurações</h3><p>Mesma regra de pagamento do sistema original.</p></div><span class="pill" id="routeApiStatus">API de rota pendente</span></div>
+        <div class="travel-config-grid">
+          <label>Regra de Pagamento<select id="tripPaymentRule"><option value="all">Pagar todos</option><option value="max-hours">Limite de horas</option></select></label>
+          <label id="maxHoursLabel" class="hidden">Máx. Horas<input id="tripMaxHours" type="number" min="0.5" step="0.5" value="1"></label>
+          <div class="route-help"><b>Busca de rota:</b> a interface já usa o mesmo contrato do endpoint original <code>/api/calculate-route</code>. A chave OpenRouteService continuará no servidor privado, nunca no GitHub público.</div>
+        </div>
+      </section>
+
+      <div id="tripItems" class="trip-items"></div>
+      <p class="route-footer">Digite cidade e estado (ex.: “São Paulo, SP”) e clique em Calcular.</p>
+    </section>
+    <section class="tab-panel placeholder" id="tab-nota-reversa"><h2>Nota Reversa</h2><p>Em migração.</p></section>
+    <section class="tab-panel placeholder" id="tab-negociacao"><h2>Negociação</h2><p>Em migração.</p></section>
+    <section class="tab-panel placeholder" id="tab-resumo"><h2>Resumo Final</h2><p>Em migração.</p></section>
+    <section class="tab-panel placeholder" id="tab-historico"><h2>Histórico</h2><p>Será conectado ao banco de orçamentos depois da validação da interface.</p></section>
+    <section class="tab-panel placeholder" id="tab-tabela-precos"><h2>Tabela de Preços</h2><p>A integração com o terceiro sistema será feita após a migração independente dos módulos.</p></section>
+    <section class="tab-panel placeholder" id="tab-custos-hh"><h2>Custos HH</h2><p>Posteriormente este módulo poderá consultar diretamente o Calc HH da plataforma.</p></section>
+  </main>
+  <div class="toast" id="toast"></div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script src="viagens.js"></script>
+  <script src="despesas.js"></script>
+  <script src="nota-reversa.js"></script>
+  <script src="negociacao.js"></script>
+  <script src="resumo.js"></script>
+  <script src="historico.js"></script>
+</body>
+</html>
