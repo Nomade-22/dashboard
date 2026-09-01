@@ -22,5 +22,6 @@ if (localStorage.getItem('multprest_orc_team_size_v1') === null) {
   load('../calc-hh/core.js')
     .then(()=>load('custos-hh.js'))
     .then(()=>load('remote-db.js'))
+    .then(()=>load('tabela-precos.js'))
     .catch((error)=>console.warn('Integração privada parcialmente indisponível:',error));
 })();
