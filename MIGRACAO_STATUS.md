@@ -84,7 +84,16 @@ Com os parâmetros padrão migrados, a fórmula deve retornar aproximadamente:
 - [x] Cards de Mão de Obra, Material, Despesas de Viagem, Estadia, Transporte, Alimentação e Horas Viajadas
 - [x] Detalhamento completo e subtotal de alimentação
 - [x] Distribuição percentual de custos preservada
-- [ ] Histórico
+- [x] Histórico local de Orçamentos
+- [x] Salvar e atualizar orçamento com número, cliente, descrição, status e observações
+- [x] Fotografia completa dos itens do orçamento
+- [x] Fotografia dos parâmetros históricos BDI/HH para reproduzir cálculo antigo
+- [x] Abrir/restaurar orçamento salvo
+- [x] Opção de restaurar ou manter os parâmetros atuais ao abrir um histórico
+- [x] Novo orçamento preservando configurações globais
+- [x] Busca, duplicação, exclusão e exportação JSON
+- [x] Importação de histórico JSON
+- [ ] Persistência do Histórico no banco privado
 - [ ] Tabela de Preços interna
 - [ ] Custos HH integrados
 - [ ] Autenticação e usuários
@@ -110,6 +119,9 @@ A negociação recebe uma fotografia dos valores da Nota Reversa. Ao aplicar des
 
 ### Resumo Final
 Mantém a consolidação do `Dashboard.tsx` original: `Preço Final Total = Mão de Obra + Material + Estadia + Transporte + Almoço + Janta + Café + Horas Viajadas`. `Despesas de Viagem` é exibido também como subtotal visual, sem ser somado novamente no total geral. O Lucro Final continua sendo o resultado da Nota Reversa, como no sistema original.
+
+### Histórico
+Nesta etapa o Histórico usa `localStorage`, pois ainda não há autenticação/API privada na plataforma consolidada. Cada registro guarda uma fotografia dos estados do orçamento e, separadamente, dos parâmetros BDI, tarifas HH e custos internos usados naquele momento. Ao abrir um registro antigo, o usuário pode restaurar também esses parâmetros para reproduzir o cálculo histórico. Esses dados não são gravados no código público do GitHub.
 
 ## 4. Tabela de Preços
 - [ ] Migração ainda não iniciada
