@@ -3,6 +3,14 @@
 // e repassa a consulta ao backend original, onde a chave do OpenRouteService continua protegida.
 window.MULTPREST_ROUTE_API = window.MULTPREST_ROUTE_API || 'https://multprest-route-gateway-jhonatan23.vercel.app/api/calculate-route';
 
+// Proteção + sincronização criptografada do módulo.
+(() => {
+  const s=document.createElement('script');
+  s.src='../auth-client.js';
+  s.dataset.scope='orcamentos';
+  document.head.appendChild(s);
+})();
+
 // No sistema original a equipe padrão começa com até 9 pessoas por dia.
 // Só aplicamos o fallback quando o usuário ainda não salvou outra configuração.
 if (localStorage.getItem('multprest_orc_team_size_v1') === null) {
