@@ -1,6 +1,7 @@
 // Configuração pública da interface.
-// A URL da API de rotas será preenchida quando publicarmos o backend privado.
-window.MULTPREST_ROUTE_API = window.MULTPREST_ROUTE_API || '';
+// Reutiliza o endpoint original do Sistema de Orçamentos para cálculo de rotas.
+// A chave do OpenRouteService permanece exclusivamente no backend original.
+window.MULTPREST_ROUTE_API = window.MULTPREST_ROUTE_API || 'https://73ee0db2-d333-4cc6-9729-ca6149cffff7.created.app/api/calculate-route';
 
 // No sistema original a equipe padrão começa com até 9 pessoas por dia.
 // Só aplicamos o fallback quando o usuário ainda não salvou outra configuração.
