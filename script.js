@@ -8,12 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     history.replaceState(null, '', `#${system}`);
   }
 
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => activateSystem(tab.dataset.system));
-  });
+  tabs.forEach(tab => tab.addEventListener('click', () => activateSystem(tab.dataset.system)));
 
   const requested = location.hash.replace('#', '');
-  if (['orcamentos', 'calc-hh', 'precos'].includes(requested)) {
-    activateSystem(requested);
-  }
+  if (['orcamentos', 'calc-hh', 'precos', 'adequacoes'].includes(requested)) activateSystem(requested);
 });
