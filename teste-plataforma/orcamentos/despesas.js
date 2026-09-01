@@ -60,7 +60,7 @@
   function transportItemCalc(t){
     const tr=travel(),useKm=num(t.manualKm)>0?num(t.manualKm):num(tr.totalDistance),useTrips=num(t.manualViagens)>0?num(t.manualViagens):(num(tr.totalViagens)||1);
     const costPerKm=num(t.kmPerLiter)>0?num(t.gasPricePerLiter)/num(t.kmPerLiter):0;
-    const gasCost=useKm*costPerKm,base=(gasCost+num(t.toll))*useTrips;
+    const gasCost=useKm*costPerKm,base=gasCost+num(t.toll)*useTrips;
     return {useKm,useTrips,costPerKm,gasCost,base,total:withBDI(base,t.clientId)};
   }
   function compute(){
