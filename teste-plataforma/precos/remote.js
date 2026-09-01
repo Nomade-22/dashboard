@@ -1,5 +1,5 @@
 'use strict';
-(() => {const s=document.createElement('script');s.src='../auth-client.js?v=20260901-152205';s.dataset.scope='precos';document.head.appendChild(s)})();
+(() => {const s=document.createElement('script');s.src='../auth-client.js?v=20260901-supabase2';s.dataset.scope='precos';document.head.appendChild(s)})();
 (() => {
   const API='https://1c6ea4b9-b2b7-4514-aae1-ab1263b2b25d.created.app';
   const KEY_M='multprest_prices_materials_v1';
