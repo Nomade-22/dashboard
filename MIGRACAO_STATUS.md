@@ -29,6 +29,9 @@ A branch `main` permanece sem alterações durante a validação.
 - [x] Normal / 50% / 100% / 120%
 - [x] Equipe padrão alinhada ao original: 9 quando não existe configuração salva
 - [x] Horas Viajadas validadas: ida/volta, dias, pessoas, limite de horas e custo
+- [x] Busca Origem → Destino conectada ao gateway de rotas
+- [x] Gateway Vercel encaminha para o endpoint original de OpenRouteService sem expor chave
+- [x] CORS do gateway restrito a `https://nomade-22.github.io`
 - [x] Despesas corrigidas e validadas contra o original: múltiplos itens, veículos, BDI por cliente, KM/viagens automáticos ou manuais e sincronização com Mão de Obra
 - [x] Nota Reversa validada numericamente
 - [x] Negociação validada e alinhada ao comportamento matemático original
@@ -39,7 +42,6 @@ A branch `main` permanece sem alterações durante a validação.
 - [x] Integração opcional com custo interno do Calc HH
 - [x] Conexão do Histórico original preparada com fallback local
 - [ ] Persistência compartilhada do Histórico — liberar somente através do login/gateway autenticado
-- [ ] Backend privado de rotas OpenRouteService
 - [ ] Autenticação e usuários
 
 ### Regra crítica de BDI
@@ -92,10 +94,23 @@ Consultar ou atualizar a Tabela não altera o Orçamento. O material só é envi
 - [x] Navegação entre os três sistemas e abas principais conferida
 - [x] Relatório detalhado disponível em `VALIDACAO_V1.md`
 
-**Conclusão da etapa 1:** aprovada para continuar a implantação. As limitações restantes são deliberadas: busca real de rotas pertence ao passo 2; gravações compartilhadas dependem do passo 3 (autenticação); Dashboard sensível continua reservado para o passo 5.
+## Etapa 2 — Rotas Origem → Destino
+- [x] Endpoint original `/api/calculate-route` reanalisado
+- [x] Geocodificação continua limitada ao Brasil
+- [x] Perfil `driving-car` e retorno de distância/tempo preservados
+- [x] Chave OpenRouteService continua somente no backend original
+- [x] Detectada ausência de CORS no endpoint original para uso pelo GitHub Pages
+- [x] Gateway dedicado `multprest-route-gateway` criado no Vercel
+- [x] Gateway de produção configurado para encaminhar ao backend original
+- [x] CORS restrito ao domínio oficial do GitHub Pages
+- [x] Código do gateway versionado em `route-gateway/`
+- [x] `orcamentos/config.js` aponta a aba Viagens para o gateway
+- [x] Horas manuais continuam como fallback
+- [ ] Smoke test final no navegador do domínio `nomade-22.github.io` — executar quando a branch de teste/plataforma for publicada nesse domínio
+
+**Conclusão da etapa 2:** implementação concluída. A plataforma já está configurada para usar a rota real sem expor a chave do OpenRouteService. O teste end-to-end de CORS fica deliberadamente para o momento em que a nova branch estiver servida pelo domínio autorizado.
 
 ## Próximos passos restantes
-2. Backend privado da busca de rotas Origem → Destino
 3. Login/autenticação e liberação das escritas remotas
 5. Integração do Dashboard sensível por último
 
