@@ -6,7 +6,7 @@ window.MULTPREST_ROUTE_API = window.MULTPREST_ROUTE_API || 'https://multprest-ro
 // Proteção + sincronização criptografada do módulo.
 (() => {
   const s=document.createElement('script');
-  s.src='../auth-client.js?v=20260901-152205';
+  s.src='../auth-client.js?v=20260901-supabase2';
   s.dataset.scope='orcamentos';
   document.head.appendChild(s);
 })();
