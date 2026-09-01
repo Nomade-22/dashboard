@@ -6,31 +6,38 @@ A branch `main` permanece sem alterações durante a validação.
 ## 1. Portal principal
 - [x] Entrada única da Plataforma Multprest
 - [x] Orçamentos, Calc HH e Tabela de Preços
+- [x] Navegação principal conferida
 - [x] Dashboard sensível reservado para a etapa final
 
 ## 2. Calc HH
 - [x] Interface principal migrada
 - [x] Calculadora, Tabela de Valores e Custo Fixo
-- [x] Fórmulas originais preservadas
+- [x] Fórmulas originais preservadas e validadas numericamente
 - [x] Antecipação, margem de negociação e prova real
 - [x] Exportação TXT/CSV
 - [x] Núcleo reutilizado opcionalmente pelo Orçamento
-- [x] Conexão de leitura com o banco original pela API pública própria do Calc HH
+- [x] Conexão de leitura com o banco original pela API própria do Calc HH
 - [x] Tabela de Valores pode usar os valores atuais retornados pelo banco
 - [x] Salários-base do banco só são aplicados ao Calc HH após confirmação explícita
+- [x] Fallback Serralheiro/Soldador alinhado ao original (R$ 3.000,00)
 - [ ] Escrita remota das configurações — habilitar após autenticação
 
 ## 3. Orçamentos
 - [x] BDI separado por cliente e prazo
-- [x] Fórmula por divisor e juros compostos preservados
+- [x] Fórmula por divisor e juros compostos preservados e validados
 - [x] Mão de Obra — Cliente + Profissional + Tipo de Hora
 - [x] Normal / 50% / 100% / 120%
-- [x] Horas Viajadas, Despesas, Nota Reversa, Negociação e Resumo Final
+- [x] Equipe padrão alinhada ao original: 9 quando não existe configuração salva
+- [x] Horas Viajadas validadas: ida/volta, dias, pessoas, limite de horas e custo
+- [x] Despesas corrigidas e validadas contra o original: múltiplos itens, veículos, BDI por cliente, KM/viagens automáticos ou manuais e sincronização com Mão de Obra
+- [x] Nota Reversa validada numericamente
+- [x] Negociação validada e alinhada ao comportamento matemático original
+- [x] Resumo Final validado e sem dupla soma de Despesas de Viagem
 - [x] Histórico local com fotografia completa do orçamento e parâmetros históricos
 - [x] Integração opcional com Tabela de Preços
+- [x] Aba interna Tabela de Preços aponta para o módulo real e não puxa itens automaticamente
 - [x] Integração opcional com custo interno do Calc HH
-- [x] Conexão do Histórico original preparada e verificada em tempo de execução
-- [x] Fallback local preservado se a API remota não autorizar acesso cross-origin
+- [x] Conexão do Histórico original preparada com fallback local
 - [ ] Persistência compartilhada do Histórico — liberar somente através do login/gateway autenticado
 - [ ] Backend privado de rotas OpenRouteService
 - [ ] Autenticação e usuários
@@ -51,8 +58,9 @@ Não existe um BDI único para todos os clientes. Perfil, prazo e condições co
 - [x] Exportação Excel
 - [x] Integração opcional `Adicionar ao orçamento`
 - [x] Cliente obrigatório antes do envio ao Orçamento
-- [x] Conexão de leitura com o banco real pela API pública própria da Tabela de Preços
+- [x] Conexão de leitura com o banco real pela API própria da Tabela de Preços
 - [x] Botão `Atualizar do banco` copia a base atual para o navegador sem expor credenciais
+- [x] Sincronização paginada para carregar toda a base, não apenas os primeiros 500 registros
 - [x] Categorias, subcategorias, fornecedor, unidade e preço vêm do banco original
 - [ ] Escrita remota de materiais/orçamentos — habilitar após autenticação
 
@@ -69,11 +77,25 @@ Consultar ou atualizar a Tabela não altera o Orçamento. O material só é envi
 - [x] Nenhuma `DATABASE_URL`, senha, token ou dump SQL foi publicado no GitHub
 - [x] Escritas sensíveis ficaram deliberadamente bloqueadas até existir autenticação
 
-**Conclusão da etapa 4:** a camada de dados está conectada sem expor credenciais. A leitura dos dados atuais de Preços e Calc HH pode ser feita diretamente pelos endpoints próprios dos sistemas. O Histórico está preparado para o banco remoto, mas a sincronização compartilhada de escrita será ativada junto com o passo de autenticação, pois não é seguro abrir gravação do banco para um GitHub Pages público.
+## Etapa 1 — Validação comparativa
+- [x] Códigos originais dos três ZIPs comparados com a migração
+- [x] 31 testes numéricos de referência executados e aprovados
+- [x] Calc HH validado
+- [x] BDI validado
+- [x] Mão de Obra validada
+- [x] Horas Viajadas validadas
+- [x] Despesas validadas após correção multi-item
+- [x] Nota Reversa validada
+- [x] Negociação validada
+- [x] Resumo Final validado
+- [x] Tabela de Preços validada, inclusive paginação da base
+- [x] Navegação entre os três sistemas e abas principais conferida
+- [x] Relatório detalhado disponível em `VALIDACAO_V1.md`
+
+**Conclusão da etapa 1:** aprovada para continuar a implantação. As limitações restantes são deliberadas: busca real de rotas pertence ao passo 2; gravações compartilhadas dependem do passo 3 (autenticação); Dashboard sensível continua reservado para o passo 5.
 
 ## Próximos passos restantes
-1. Validação comparativa dos cálculos e navegação
-2. Backend privado da busca de rotas
+2. Backend privado da busca de rotas Origem → Destino
 3. Login/autenticação e liberação das escritas remotas
 5. Integração do Dashboard sensível por último
 
