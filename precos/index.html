@@ -1,1 +1,102 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tabela de Preços — Plataforma Multprest</title><style>body{margin:0;font-family:Inter,Arial,sans-serif;background:#080d18;color:#edf3fb;min-height:100vh;display:grid;place-items:center}.box{width:min(680px,calc(100% - 32px));border:1px solid #243248;background:#101827;border-radius:20px;padding:30px;box-shadow:0 25px 70px rgba(0,0,0,.3)}a{color:#7db1ff;text-decoration:none;font-weight:700}.tag{font-size:12px;color:#7db1ff;text-transform:uppercase;font-weight:800;letter-spacing:.12em}h1{margin:10px 0}p{color:#94a3b8;line-height:1.65}</style></head><body><main class="box"><span class="tag">Sistema 03</span><h1>Tabela de Preços</h1><p>Área preparada para receber o sistema original de materiais, mantendo códigos, categorias, subcategorias e composição de orçamento.</p><p>Este módulo será migrado depois do sistema de Orçamentos.</p><a href="../#precos">← Voltar à Plataforma Multprest</a></main></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Tabela de Preços — Multprest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <a class="back" href="../#precos" title="Voltar à Plataforma">←</a>
+    <div class="brand-icon">$</div>
+    <div class="brand-copy"><h1>Tabela de Preços</h1><p>Consulta rápida para orçamentos</p></div>
+    <div class="header-actions">
+      <input id="fileImport" type="file" accept=".xlsx,.xls,.csv,.json" hidden>
+      <button class="btn green" id="btnImport">⇧ Importar Excel</button>
+      <button class="btn purple" id="btnBudgets">▣ Orçamentos</button>
+      <button class="btn orange" id="btnSaveBudget">▣ Salvar Orçamento</button>
+      <button class="btn blue" id="btnAdd">＋ Adicionar Material</button>
+      <button class="btn teal" id="btnExport">⇩ Exportar Excel</button>
+      <button class="btn red" id="btnDeleteAll">× Apagar Todos</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="security-note"><b>Modo de migração:</b> a base real não está gravada no GitHub público. Nesta etapa, materiais e orçamentos ficam neste navegador e podem ser importados. Depois serão ligados ao banco privado autenticado.</div>
+
+  <section class="stats">
+    <article class="stat"><span>Total de Materiais</span><strong id="statCount">0</strong></article>
+    <article class="stat total"><span>Valor Total do Orçamento</span><strong id="statTotal">R$ 0,00</strong></article>
+  </section>
+
+  <section class="filters card">
+    <div class="filter-grid two">
+      <label class="search"><span>⌕</span><input id="searchMaterial" placeholder="Buscar material..."></label>
+      <label class="search purple-search"><span>⌕</span><input id="searchSupplier" placeholder="Filtrar por fornecedor..."></label>
+    </div>
+    <div class="filter-grid two">
+      <select id="filterCategory"><option value="">Todas as categorias</option></select>
+      <select id="filterSubcategory" disabled><option value="">Todas as subcategorias</option></select>
+    </div>
+    <div id="activeFilters" class="active-filters"></div>
+  </section>
+
+  <section id="editor" class="card editor hidden">
+    <div class="card-head"><div><h2 id="editorTitle">Novo Material</h2><p>Cadastro independente da Tabela de Preços.</p></div><button class="icon-btn" id="btnCancelEditor">×</button></div>
+    <div class="editor-grid">
+      <label>Material<input id="edName" placeholder="Nome do material"></label>
+      <label>Unidade<input id="edUnit" placeholder="un, kg, m, m²..."></label>
+      <label>Preço<input id="edPrice" type="number" min="0" step="0.01" placeholder="0,00"></label>
+      <label>Fornecedor<input id="edSupplier" placeholder="Fornecedor"></label>
+      <label>Categoria<input id="edCategory" list="categoryList" placeholder="Categoria"><datalist id="categoryList"></datalist></label>
+      <label>Subcategoria<input id="edSubcategory" list="subcategoryList" placeholder="Subcategoria"><datalist id="subcategoryList"></datalist></label>
+    </div>
+    <div class="editor-actions"><button class="btn light" id="btnCancelEditor2">Cancelar</button><button class="btn green" id="btnSaveMaterial">✓ Salvar</button></div>
+  </section>
+
+  <section class="card table-card">
+    <div class="card-head"><div><h2>Materiais</h2><p>Quantidade e total funcionam como no sistema original.</p></div><span id="visibleCount" class="pill">0 exibidos</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Material</th><th>Categoria</th><th>Subcategoria</th><th>Fornecedor</th><th>Unidade</th><th>Preço</th><th>Quantidade</th><th>Total</th><th>Ações</th></tr></thead>
+        <tbody id="materialsBody"></tbody>
+      </table>
+    </div>
+    <div id="emptyState" class="empty hidden">Nenhum material encontrado.</div>
+  </section>
+</main>
+
+<div class="modal hidden" id="budgetSaveModal"><div class="modal-box small">
+  <div class="modal-head"><h2>Salvar Orçamento</h2><button data-close="budgetSaveModal">×</button></div>
+  <label class="modal-field">Nome do orçamento<input id="budgetName" placeholder="Ex.: Materiais obra Vibra"></label>
+  <p class="hint">São salvos somente os materiais com quantidade maior que zero.</p>
+  <div class="modal-actions"><button class="btn light" data-close="budgetSaveModal">Cancelar</button><button class="btn blue" id="btnConfirmSaveBudget">Salvar</button></div>
+</div></div>
+
+<div class="modal hidden" id="budgetsModal"><div class="modal-box">
+  <div class="modal-head"><div><h2>Orçamentos Salvos</h2><p>Orçamentos próprios da Tabela de Preços.</p></div><button data-close="budgetsModal">×</button></div>
+  <div id="budgetsList" class="budget-list"></div>
+</div></div>
+
+<div class="modal hidden" id="sendModal"><div class="modal-box small">
+  <div class="modal-head"><div><h2>Adicionar ao Orçamento</h2><p>Integração opcional. Nada é enviado sem sua confirmação.</p></div><button data-close="sendModal">×</button></div>
+  <div id="sendMaterialInfo" class="send-info"></div>
+  <div class="send-grid">
+    <label>Quantidade<input id="sendQty" type="number" min="0.0001" step="0.01" value="1"></label>
+    <label>Cliente / perfil BDI<select id="sendClient"></select></label>
+  </div>
+  <div class="send-total"><span>Custo que entrará no Orçamento</span><strong id="sendTotal">R$ 0,00</strong></div>
+  <div class="modal-actions"><button class="btn light" data-close="sendModal">Apenas consultar / fechar</button><button class="btn blue" id="btnConfirmSend">Adicionar ao orçamento</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body></html>
