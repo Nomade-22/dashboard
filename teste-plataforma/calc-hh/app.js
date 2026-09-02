@@ -8,7 +8,7 @@
     script.onerror = reject;
     document.head.appendChild(script);
   });
-  load('../auth-client.js?v=20260901-supabase2','calc-hh')
+  load('../auth-client.js?v=20260902-prodcheck1','calc-hh')
     .then(() => load('core.js'))
     .then(() => load('fallback.js'))
     .then(() => load('ui.js'))
