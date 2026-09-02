@@ -18,7 +18,7 @@
         <div class="logo">M</div>
         <div><h1>Sistema de Orçamentos</h1><p>Multprest Serviços Industriais</p></div>
       </div>
-      <span class="migration-badge">Migração v1</span>
+      <span class="migration-badge">Versão de validação</span>
     </div>
   </header>
 
@@ -51,10 +51,10 @@
 
       <section class="card labor-rate-card">
         <div class="card-title actions-title">
-          <div><h3>Tabela de Preços (R$/hora)</h3><p>As taxas são específicas por Profissional + Cliente. Os tipos de hora aplicam multiplicadores sobre esta taxa base.</p></div>
+          <div><h3>Tabela de Tarifas Comerciais (R$/hora)</h3><p>As taxas são específicas por Profissional + Cliente. Os tipos de hora aplicam multiplicadores sobre esta taxa base.</p></div>
           <div><button class="btn ghost" id="btnResetRates">↻ Zerar taxas locais</button><button class="btn" id="btnSaveRates">Salvar tabela neste navegador</button></div>
         </div>
-        <div class="warning-box compact"><b>Segurança:</b> a base de produção não está escrita no código público desta branch. Para testes, importe sua tabela local ou preencha os valores; depois conectaremos a API privada.</div>
+        <div class="warning-box compact"><b>Fonte das tarifas:</b> Calc HH por Profissional + Cliente. Valores manuais do Orçamento continuam tendo prioridade.</div>
         <div class="rate-table-wrap"><table class="rate-table" id="laborRateTable"></table></div>
       </section>
 
@@ -126,7 +126,7 @@
       </section>
     </section>
 
-    <section class="tab-panel placeholder" id="tab-despesas"><h2>Despesas</h2><p>Hospedagem, transporte, almoço, janta e café serão preservados e utilizarão os KM/viagens calculados nesta aba.</p></section>
+    <section class="tab-panel placeholder" id="tab-despesas"><h2>Despesas</h2><p>Carregando módulo de estadia, transporte e alimentação...</p></section>
 
     <section class="tab-panel" id="tab-viagens">
       <div class="page-title">
@@ -139,7 +139,7 @@
         <div class="kpi purple"><span>Tempo</span><strong id="tripKpiTime">0 min</strong></div>
         <div class="kpi green"><span>Pago</span><strong id="tripKpiPaid">0 min</strong></div>
         <div class="kpi amber"><span>P-Horas</span><strong id="tripKpiPH">0,0</strong></div>
-        <div class="kpi teal"><span>Custo</span><strong id="tripKpiCost">R$ 0,00</strong></div>
+        <div class="kpi teal"><span>Valor Horas Viajadas</span><strong id="tripKpiCost">R$ 0,00</strong></div>
       </div>
 
       <section class="card travel-config">
@@ -147,19 +147,19 @@
         <div class="travel-config-grid">
           <label>Regra de Pagamento<select id="tripPaymentRule"><option value="all">Pagar todos</option><option value="max-hours">Limite de horas</option></select></label>
           <label id="maxHoursLabel" class="hidden">Máx. Horas<input id="tripMaxHours" type="number" min="0.5" step="0.5" value="1"></label>
-          <div class="route-help"><b>Busca de rota:</b> a interface já usa o mesmo contrato do endpoint original <code>/api/calculate-route</code>. A chave OpenRouteService continuará no servidor privado, nunca no GitHub público.</div>
+          <div class="route-help"><b>Busca de rota:</b> cálculo servido pela função segura do Supabase. A chave OpenRouteService permanece somente no servidor e não é exposta no GitHub público.</div>
         </div>
       </section>
 
       <div id="tripItems" class="trip-items"></div>
       <p class="route-footer">Digite cidade e estado (ex.: “São Paulo, SP”) e clique em Calcular.</p>
     </section>
-    <section class="tab-panel placeholder" id="tab-nota-reversa"><h2>Nota Reversa</h2><p>Em migração.</p></section>
-    <section class="tab-panel placeholder" id="tab-negociacao"><h2>Negociação</h2><p>Em migração.</p></section>
-    <section class="tab-panel placeholder" id="tab-resumo"><h2>Resumo Final</h2><p>Em migração.</p></section>
-    <section class="tab-panel placeholder" id="tab-historico"><h2>Histórico</h2><p>Será conectado ao banco de orçamentos depois da validação da interface.</p></section>
-    <section class="tab-panel placeholder" id="tab-tabela-precos"><h2>Tabela de Preços</h2><p>A integração com o terceiro sistema será feita após a migração independente dos módulos.</p></section>
-    <section class="tab-panel placeholder" id="tab-custos-hh"><h2>Custos HH</h2><p>Posteriormente este módulo poderá consultar diretamente o Calc HH da plataforma.</p></section>
+    <section class="tab-panel placeholder" id="tab-nota-reversa"><h2>Nota Reversa</h2><p>Carregando módulo...</p></section>
+    <section class="tab-panel placeholder" id="tab-negociacao"><h2>Negociação</h2><p>Carregando módulo...</p></section>
+    <section class="tab-panel placeholder" id="tab-resumo"><h2>Resumo Final</h2><p>Carregando módulo...</p></section>
+    <section class="tab-panel placeholder" id="tab-historico"><h2>Histórico</h2><p>Carregando histórico de orçamentos...</p></section>
+    <section class="tab-panel placeholder" id="tab-tabela-precos"><h2>Tabela de Preços</h2><p>Carregando integração opcional...</p></section>
+    <section class="tab-panel placeholder" id="tab-custos-hh"><h2>Custos HH</h2><p>Carregando integração com Calc HH...</p></section>
   </main>
   <div class="toast" id="toast"></div>
   <script src="config.js"></script>
