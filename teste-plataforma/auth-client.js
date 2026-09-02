@@ -2,14 +2,10 @@
 (()=>{
   const API='https://adugefhgzqruajjdavba.supabase.co/functions/v1/multprest-sync';
   const SESSION='multprest_platform_session_key_v1';
-  const VERIFIER='O0y9vs6ydPjZzK5LvD6-WL-m-Z-AfZYy2Xq1FDi1t_A';
   const script=document.currentScript;
   const scope=script?.dataset?.scope||'';
   const PREFIXES={orcamentos:['multprest_orc_'], 'calc-hh':['multprest_calc_hh_'], precos:['multprest_prices_'], adequacoes:['adq_civis_']};
-  const b64u=buf=>{let s='';new Uint8Array(buf).forEach(b=>s+=String.fromCharCode(b));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
-  const from64=s=>{s=String(s||'').replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const b=atob(s),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a};
   const sessionKey=()=>sessionStorage.getItem(SESSION)||'';
-  async function validKey(v){try{const raw=from64(v);if(raw.length!==32)return false;const k=await crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign']);const sig=await crypto.subtle.sign('HMAC',k,new TextEncoder().encode('multprest-auth-v1'));return b64u(sig)===VERIFIER}catch{return false}}
   function rootPath(){try{return new URL('./',script.src).pathname}catch{return '/dashboard/teste-plataforma/'}}
   function goLogin(){location.replace(`${rootPath()}login/?next=${encodeURIComponent(location.href)}`)}
   function collect(){const ps=PREFIXES[scope]||[];const out={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(ps.some(p=>k.startsWith(p)))out[k]=localStorage.getItem(k)}return out}
@@ -30,7 +26,6 @@
     try{
       const health=await api('/health');
       if(!health?.ok||!health?.storage)throw new Error('armazenamento indisponível');
-      await api('/auth-check',{method:'POST'});
       dot.classList.add('ok');
       status.textContent='Sincronização remota online • Supabase';
       if(scope){
@@ -41,6 +36,6 @@
       }
     }catch(e){dot.classList.add('bad');status.textContent='Remoto offline • sistema continua local';actions.innerHTML='';console.warn('Sincronização remota indisponível:',e)}
   }
-  async function init(){const k=sessionKey();if(!k||!(await validKey(k))){sessionStorage.removeItem(SESSION);goLogin();return}const bar=inject();setupRemote(bar)}
+  async function init(){const k=sessionKey();if(!k){goLogin();return}try{await api('/auth-check',{method:'POST'})}catch{sessionStorage.removeItem(SESSION);goLogin();return}const bar=inject();setupRemote(bar)}
   init();
 })();
